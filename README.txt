@@ -1,6 +1,4 @@
+TileViewer - Tiled Image Viewer Client & Server Version 2.0
 
-jQuery TileViewer Plugin version 2.0 
-
-Author:     Soichi Hayashi (soichih@gmail.com)
-License:    MIT
+TileViewer allows you to turn any stupendously large image into tiles and expose them through a HTML5 capable web browser using TileViewer client application.
 
