@@ -1,0 +1,52 @@
+<!DOCTYPE html> 
+<html> 
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+    <title>TileViewer jQuery Plugin</title>
+    <link rel="stylesheet" href="all.css" type="text/css" media="all"  />
+
+    <script src="http://jqueryjs.googlecode.com/files/jquery-1.3.2.min.js"></script>
+    <script src="jquery.mousewheel.js"></script>
+
+    <script src="jquery.tileviewer.js"></script>
+    <link rel="stylesheet" href="jquery.tileviewer.css" type="text/css" media="all"  />
+</head>
+<body>
+
+Sample 1(first)<br>
+<div class="tv1"></div>
+
+Sample 1(second)<br>
+<div class="tv1"></div>
+
+Sample 2<br>
+<div id="tv2"></div>
+
+Sample 3<br>
+<div id="tv3"></div>
+
+machine<br>
+<div id="odi"></div>
+
+<script>
+$(function() {
+    $(".tv1").tileviewer(); //use default
+    $("#tv2").tileviewer({
+        src: "tiles/deep_lens_survey",
+        width: 500,
+        height: 400
+    });
+    $("#tv3").tileviewer({
+        src: "tiles/aerial",
+        width: 600,
+        height: 300
+    });
+    $("#odi").tileviewer({
+        src: "tiles/odi",
+        width: 900,
+        height: 500
+    });
+})
+</script>
+</body>
+</html>
