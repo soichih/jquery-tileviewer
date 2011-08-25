@@ -95,7 +95,13 @@ var methods = {
                     if(y == layer.ytilenum-1) {
                         ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
                     }
-                    ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
+                    if($.browser.mozilla) {
+                        //firefox can't draw sub-pixel image .. adjust it..
+                        ctx.drawImage(img, Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize),    
+                            Math.ceil(xsize),Math.ceil(ysize));
+                    } else {
+                        ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
+                    }
                 }
 
                 if(img == null) {
@@ -149,8 +155,15 @@ var methods = {
                         if(x == layer.xtilenum-1) sw = layer.tilesize_xlast/factor;
                         var sh = half_tilesize;
                         if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
-                        ctx.drawImage(img, sx, sy, sw, sh, 
-                            layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
+                        if($.browser.mozilla) {
+                            //firefox can't draw sub-pixel image .. adjust it..
+                            ctx.drawImage(img, sx, sy, sw, sh, 
+                                Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize), 
+                                Math.ceil(xsize),Math.ceil(ysize));
+                        } else {
+                            ctx.drawImage(img, sx, sy, sw, sh, 
+                                layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
+                        }
                         return;
                     }
                     //try another level
