@@ -1,8 +1,10 @@
 .tileviewer {
+display: inline-block;
 position: relative;
+border: 5px solid black;
+line-height: 0%; /*without this, there will be a weird bottom space..*/
 }
 .tileviewer canvas {
-border: 5px solid black;
 }
 .tileviewer span.status {
 position: absolute;
@@ -10,9 +12,11 @@ font-size: 8pt;
 bottom: 8px;
 left: 7px;
 }
+/*
 .tileviewer canvas.mode_pan:active {
 cursor: pointer;
 }
 .tileviewer canvas.mode_pan:active {
 cursor: move;
 }
+*/

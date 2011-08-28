@@ -11,27 +11,94 @@
     <link rel="stylesheet" href="jquery.tileviewer.css" type="text/css" media="all"  /> 
     <link rel="stylesheet" href="all.css" type="text/css" media="all"  /> 
     <script src="jquery.tileviewer.js"></script> 
+    <style>
+    body {
+    margin-left: 50px;
+    }
+    .pan {
+        text-decoration: underline;
+        cursor: pointer;
+    }
+    table {
+    border-collapse: collapse;
+    }
+    table td {
+        vertical-align: top;
+    }
+    </style>
 
 </head>
 <body>
+<h1>TileViewer Demo</h1>
 
-Sample 1(first)<br>
-<div class="tv1"></div>
+Machine
+<table><tr>
+<td>
+    <div id="machine"></div>
+</td>
+<td>
+    <h2>Goto..</h2>
+    <span id="pan_handle" class="pan">handle</span><br>
+    <span id="pan_circle" class="pan">circle</span><br>
+    <span id="pan_bottom" class="pan">bottom tip</span><br>
 
-Sample 1(second)<br>
-<div class="tv1"></div>
+    <h2>Switch Mode</h2>
+    <span id="mode_pan" class="pan">pan</span><br>
+    <span id="mode_select_1d" class="pan">1d select</span><br>
+    <span id="mode_select_2d" class="pan">2d select</span><br>
+    
+</td>
+</tr></table>
 
-Sample 2<br>
-<div id="tv2"></div>
+Duplicate Test 1
+<table><tr>
+<td>
+    <div class="tv1"></div>
+</td>
+<td>
+TODO..
+</td>
+</tr></table>
 
-Sample 3<br>
-<div id="tv3"></div>
+Duplicate Test 2
+<table><tr>
+<td>
+    <div class="tv1"></div>
+</td>
+<td>
+TODO..
+</td>
+</tr></table>
 
-machine<br>
-<div id="odi"></div>
+FITS (deep lens survey)
+<table><tr>
+<td>
+    <div id="tv2"></div>
+</td>
+<td>
+TODO..
+</td>
+</tr></table>
+
+Aerial
+<table><tr>
+<td>
+    <div id="tv3"></div>
+</td>
+<td>
+TODO..
+</td>
+</tr></table>
 
 <script>
 $(function() {
+    $("#machine").tileviewer({
+        src: "tiles/odi",
+        width: 800,
+        height: 400,
+        magnifier: true
+    });
+
     $(".tv1").tileviewer(); //use default
     $("#tv2").tileviewer({
         src: "tiles/deep_lens_survey",
@@ -43,10 +110,35 @@ $(function() {
         width: 600,
         height: 300
     });
-    $("#odi").tileviewer({
-        src: "tiles/odi",
-        width: 900,
-        height: 500
+    $("#pan_handle").click(function() {
+        $("#machine").tileviewer("pan", {
+            x: 4640,
+            y: 1666,
+            level: 0
+        });
+    });
+    $("#pan_circle").click(function() {
+        $("#machine").tileviewer("pan", {
+            x: 1500,
+            y: 5200,
+            level: 3
+        });
+    });
+    $("#pan_bottom").click(function() {
+        $("#machine").tileviewer("pan", {
+            x: 3270,
+            y: 7740,
+            level: 0 
+        });
+    });
+    $("#mode_pan").click(function() {
+        $("#machine").tileviewer("setmode", {mode:"pan"});
+    });
+    $("#mode_select_1d").click(function() {
+        $("#machine").tileviewer("setmode", {mode:"select_1d"});
+    });
+    $("#mode_select_2d").click(function() {
+        $("#machine").tileviewer("setmode", {mode:"select_2d"});
     });
 })
 </script>
