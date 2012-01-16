@@ -6,11 +6,12 @@ line-height: 0%; /*without this, there will be a weird bottom space..*/
 }
 .tileviewer canvas {
 }
-.tileviewer span.status {
+.tileviewer p.status {
+width: 120px;
 position: absolute;
-font-size: 8pt;
+font-size: 9pt;
 bottom: 8px;
-left: 7px;
+right: 7px;
 }
 /*
 .tileviewer canvas.mode_pan:active {
