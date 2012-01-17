@@ -228,7 +228,7 @@ var methods = {
                                 ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
                             }
                             if($.browser.mozilla) {
-                                //firefox can't draw sub-pixel image .. adjust it..
+                                //firefox can't draw sub-pixel image (yet).. adjust it..
                                 ctx.drawImage(img, Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize),    
                                     Math.ceil(xsize),Math.ceil(ysize));
                             } else {
@@ -237,34 +237,16 @@ var methods = {
                         }
 
                         if(img == null) {
-                            img = new Image();
-                            img.loaded = false;
-                            img.loading = false;
-                            img.level_loaded_for = layer.level;
-                            img.request_src = url;
-                            img.timestamp = new Date().getTime();
-                            img.onload = function() {
-                                this.loaded = true;
-                                this.loading = false;
-                                if(this.level_loaded_for == layer.level) {
-                                    view.needdraw = true;
-                                }
-                                //console.log("done loading" + this.src);
-                                layer.loader.loading--;
-                                view.loader_load(null);
-                                view.loader_shift();
-                            };
-                            layer.tiles[url] = img;
-                            layer.loader.tile_count++;
-                            view.loader_load(img);
-                            view.loader_shift();
-                        } else if(img.loaded) {
-                            img.timestamp = new Date().getTime();
-                            dodraw(); //good.. we have the image.. dodraw
-                            return;
+                            view.loader_request(url);
                         } else {
-                            //update timestamp so that this image will get loaded soon (it could be currently loaded.. btw)
-                            img.timestamp = new Date().getTime();
+                            if(img.loaded) {
+                                img.timestamp = new Date().getTime();
+                                dodraw(); //good.. we have the image.. dodraw
+                                return;
+                            } else {
+                                //not loaded yet ... update timestamp so that this image will get loaded soon
+                                img.timestamp = new Date().getTime();
+                            }
                         }
 
                         //meanwhile .... draw subtile instead
@@ -309,12 +291,36 @@ var methods = {
                             //try another level
                             down++;
                         }
-                        
+
+/* let's not do anything 
                         //nosubtile available.. draw empty rectangle as the last resort
                         ctx.fillStyle = options.empty;
                         ctx.fillRect(layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize, ysize);
+*/
                     },
 
+                    loader_request: function(url) {
+                        var img = new Image();
+                        img.loaded = false;
+                        img.loading = false;
+                        img.level_loaded_for = layer.level;
+                        img.request_src = url;
+                        img.timestamp = new Date().getTime();
+                        img.onload = function() {
+                            this.loaded = true;
+                            this.loading = false;
+                            if(this.level_loaded_for == layer.level) {
+                                view.needdraw = true;
+                            }
+                            //console.log("done loading" + this.src);
+                            layer.loader.loading--;
+                            view.loader_load(null);
+                        };
+                        layer.tiles[url] = img;
+                        layer.loader.tile_count++;
+                        view.loader_load(img);
+                        view.loader_shift();
+                    },
                     loader_load: function(img) {
                         //if we can load more image, load it
                         if(layer.loader.loading < layer.loader.max_loading) {
@@ -587,12 +593,7 @@ var methods = {
                 //setup views
                 $this.addClass("tileviewer");
                 $(view.canvas).css("background-color", "#222");
-/*
-                $(view.canvas).css("width", options.width);
-                $(view.canvas).css("height", options.height);
-                view.canvas.width = options.width;
-                view.canvas.height = options.height;
-*/
+
                 $(view.canvas).css("width", "100%");
                 $(view.canvas).css("height", "100%");
 
@@ -622,6 +623,10 @@ var methods = {
                         layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
                         layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
 
+                        //cache level0 image (so that we don't have to use the green rect too long..)
+                        var url = options.src+"/level"+layer.info._maxlevel+"/0.png";
+                        view.loader_request(url);
+
                         view.recalc_viewparams();
                         view.needdraw = true;
                     }
@@ -638,7 +643,6 @@ var methods = {
                 //load thumbnail
                 layer.thumb = new Image();
                 layer.thumb.src = options.src+"/thumb.png";
-
 
                 // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
                 // requestAnim shim layer by Paul Irish
