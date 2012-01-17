@@ -46,6 +46,8 @@ var methods = {
             zoom_sensitivity: 32, 
             thumbnail: true,//display thumbnail
             magnifier: false,//display magnifier
+            debug: true,
+            pixel: true,
             magnifier_view_size: 128, //view size
             magnifier_view_area: 32, //pixel w/h sizes to zoom
             graber_size: 12, //size of the grabber area
@@ -62,8 +64,35 @@ var methods = {
             // Now we can start initializing
             //If the plugin hasn't been initialized yet..
             var view = $this.data("view");
-            var layer = $this.data("layer");
             if(!view) {
+                var layer = {
+                    //json.info will be loaded here (static information about the image)
+                    info:  null, 
+
+                    //current view offset - not absolute pixel offset
+                    xpos: 0,
+                    ypos: 0,
+
+                    //number of tiles on the current level
+                    xtilenum: null,
+                    ytilenum: null,
+
+                    //current tile level/size (size is usually 128-256)
+                    level: null, 
+                    tilesize: null,
+
+                    thumb: null, //thumbnail image
+                    
+                    loader: {
+                        loading: 0, //actualy number of images that are currently loaded
+                        max_loading: 6, //max number of image that can be loaded simultaneously
+                        tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
+                        max_tiles: 100 //max number of images that can be stored in tiles dictionary
+                    },
+                    tiles: [] //tiles dictionary 
+                }; //layer definition
+                $this.data("layer", layer);
+
                 var view = {
                     canvas: document.createElement("canvas"),
                     status: document.createElement("p"),
@@ -86,7 +115,6 @@ var methods = {
                     ynow: null,
                     mousedown: false,
                     framerate: null,//current framerate (1000 msec / drawtime msec)
-                    loading: 0, //number of images that are currently loading...
                     needdraw: false, //flag used to request for frameredraw 
 
                     ///////////////////////////////////////////////////////////////////////////////////
@@ -134,16 +162,22 @@ var methods = {
 
                     //TODO - let user override this
                     update_status: function() {
-                        var pixel_pos = view.client2pixel(view.xnow, view.ynow);
-                        $(view.status).html(
-                            "width: " + layer.info.width + 
-                            "<br>height: " + layer.info.height + 
-                            "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 +
-                            "<br>framerate: " + view.framerate + 
-                            "<br>images loading:" + view.loading + 
-                            "<br>x:" + pixel_pos.x + 
-                            "<br>y:" + pixel_pos.y  
-                        );
+                        if(options.debug) {
+                            var pixel_pos = view.client2pixel(view.xnow, view.ynow);
+                            $(view.status).html(
+                                "width: " + layer.info.width + 
+                                "<br>height: " + layer.info.height + 
+                                "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 + 
+                                    " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
+                                "<br>framerate: " + view.framerate + 
+                                "<br>images loading: " + layer.loader.loading + 
+                                "<br>tiles in dict: " + layer.loader.tile_count + 
+                                "<br>x:" + pixel_pos.x + 
+                                "<br>y:" + pixel_pos.y  
+                            );
+                        } else {
+                            $(view.status).empty();
+                        }
                     },
 
                     draw_tiles: function(ctx) {
@@ -203,29 +237,37 @@ var methods = {
                         }
 
                         if(img == null) {
-                            //new url.. request..
-                            var img = new Image();
+                            img = new Image();
                             img.loaded = false;
+                            img.loading = false;
+                            img.level_loaded_for = layer.level;
+                            img.request_src = url;
+                            img.timestamp = new Date().getTime();
                             img.onload = function() {
                                 this.loaded = true;
+                                this.loading = false;
                                 if(this.level_loaded_for == layer.level) {
                                     view.needdraw = true;
                                 }
-                                view.loading--;
+                                //console.log("done loading" + this.src);
+                                layer.loader.loading--;
+                                view.loader_load(null);
+                                view.loader_shift();
                             };
-                            img.onerror = function() {
-                                //console.log("failed to load " + url + " on x= " + x + " y=" + y);
-                            }
-                            img.level_loaded_for = layer.level;
-                            img.src = url;
                             layer.tiles[url] = img;
-                            view.loading++;
+                            layer.loader.tile_count++;
+                            view.loader_load(img);
+                            view.loader_shift();
                         } else if(img.loaded) {
+                            img.timestamp = new Date().getTime();
                             dodraw(); //good.. we have the image.. dodraw
                             return;
+                        } else {
+                            //update timestamp so that this image will get loaded soon (it could be currently loaded.. btw)
+                            img.timestamp = new Date().getTime();
                         }
 
-                        //draw subtile instead
+                        //meanwhile .... draw subtile instead
                         var xsize = layer.tilesize;
                         var ysize = layer.tilesize;
                         if(x == layer.xtilenum-1) {
@@ -261,6 +303,7 @@ var methods = {
                                     ctx.drawImage(img, sx, sy, sw, sh, 
                                         layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 }
+                                img.timestamp = new Date().getTime();//we should keep this image.. 
                                 return;
                             }
                             //try another level
@@ -272,6 +315,47 @@ var methods = {
                         ctx.fillRect(layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize, ysize);
                     },
 
+                    loader_load: function(img) {
+                        //if we can load more image, load it
+                        if(layer.loader.loading < layer.loader.max_loading) {
+                            if(img == null) {
+                                //find the latest image to load (unless specified)
+                                var latest_img = null;
+                                for (var url in layer.tiles) {
+                                    img = layer.tiles[url];
+                                    if(img.loaded == false && img.loading == false && (latest_img == null || img.timestamp > latest_img.timestamp)) {
+                                        latest_img = img;
+                                    }
+                                }
+                                img = latest_img;
+                            }
+                            if(img != null) {
+                                //start loading!
+                                img.src = img.request_src;
+                                layer.loader.loading++;
+                                img.loading = true;
+                                view.loader_load(); //recurse to see if we can load more image
+                            }
+                        }
+                    },
+                    loader_shift: function() {
+                        //if we have too many images in the dictionary... remove oldest used image
+                        if(layer.loader.tile_count >= layer.loader.max_tiles) {
+                            var oldest_img = null;
+                            for (var url in layer.tiles) {
+                                img = layer.tiles[url];
+                                if(img.loaded == true && (oldest_img == null || img.timestamp < oldest_img.timestamp)) {
+                                    oldest_img = img;
+                                }
+                            }
+                            if(oldest_img != null) {
+                                //get rid of this guy
+                                delete layer.tiles[oldest_img.src];
+                                layer.loader.tile_count--;
+                            }
+                        }
+                    },
+
                     draw_magnifier:  function(ctx) {
                         //grab magnifier image
                         var mcontext = view.magnifier_canvas.getContext("2d");
@@ -281,8 +365,6 @@ var methods = {
                         //display on the bottom left corner
                         ctx.drawImage(view.magnifier_canvas, 0, view.canvas.clientHeight-options.magnifier_view_size, options.magnifier_view_size, options.magnifier_view_size);
 
-                        //display where mouse is
-                        //ctx.drawImage(view.magnifier_canvas, view.xnow-options.magnifier_view_size/2, view.ynow-options.magnifier_view_size/2, options.magnifier_view_size, options.magnifier_view_size);
                     },
 
                     draw_select_1d: function(ctx) {
@@ -316,23 +398,34 @@ var methods = {
                         ctx.shadowBlur    = 2;
                         ctx.shadowColor   = 'rgba(0,0,0,0.5)';
         */
-                        //draw box
                         ctx.shadowOffsetX = 0;
                         ctx.shadowOffsetY = 0;
                         ctx.shadowBlur    = 0;
                         ctx.shadowColor   = 'rgba(0,0,0,0)';
                         ctx.strokeStyle = '#0c0'; 
                         ctx.lineWidth   = 2;
+                        ctx.fillStyle = '#0c0';
+
+                        //draw box
                         ctx.strokeRect(view.select.x, view.select.y, view.select.width, view.select.height);
 
                         //draw grabbers
                         ctx.beginPath();
                         ctx.arc(view.select.x, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topleft
-                        ctx.arc(view.select.x+view.select.width, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topright
-                        ctx.arc(view.select.x, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomleft
-                        ctx.arc(view.select.x+view.select.width, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomright
-                        ctx.fillStyle = '#0c0';
                         ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x+view.select.width, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topright
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomleft
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x+view.select.width, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomright
+                        ctx.fill();
+
                     },
 
                     recalc_viewparams: function() {
@@ -491,27 +584,6 @@ var methods = {
                 };//view definition
                 $this.data("view", view);
 
-                var layer = {
-                    //json.info will be loaded here (static information about the image)
-                    info:  null, 
-
-                    //current view offset - not absolute pixel offset
-                    xpos: 0,
-                    ypos: 0,
-
-                    //number of tiles on the current level
-                    xtilenum: null,
-                    ytilenum: null,
-
-                    //current tile level/size (size is usually 128-256)
-                    level: null, 
-                    tilesize: null,
-
-                    thumb: null, //thumbnail image
-                    tiles: [] //tiles loaded (old ones will be shifted out by loader)
-                }
-                $this.data("layer", layer);
-
                 //setup views
                 $this.addClass("tileviewer");
                 $(view.canvas).css("background-color", "#222");
@@ -528,6 +600,7 @@ var methods = {
                 $(view.status).addClass("status");
                 $this.append(view.status);
                 methods.setmode.call($this, {mode: "pan"});
+
                 //load info.json
                 $.ajax({
                     url: options.src+"/info.json",
@@ -539,9 +612,15 @@ var methods = {
                         var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
                         layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
 
-                        //set initial level/size
-                        layer.level = Math.max(0, layer.info._maxlevel-1);
+                        //set initial level/size to fit the entire view
+                        var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
+                        layer.level = layer.info._maxlevel - Math.floor(min) - 1;
                         layer.tilesize = layer.info.tilesize/2;
+
+                        //center image
+                        var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
+                        layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
+                        layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
 
                         view.recalc_viewparams();
                         view.needdraw = true;
@@ -559,6 +638,7 @@ var methods = {
                 //load thumbnail
                 layer.thumb = new Image();
                 layer.thumb.src = options.src+"/thumb.png";
+
 
                 // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
                 // requestAnim shim layer by Paul Irish
@@ -602,7 +682,7 @@ var methods = {
 */
 
                 ///////////////////////////////////////////////////////////////////////////////////
-                //set upevent handlers
+                //event handlers
                 $(view.canvas).mousedown(function(e) {
                     var offset = $(view.canvas).offset();
                     var x = e.pageX - offset.left;
@@ -801,7 +881,7 @@ var methods = {
 
     ///////////////////////////////////////////////////////////////////////////////////
     // use this to animate the view (or zoom)
-    setpos: function (options) {
+    pan: function (options) {
         console.log("requested level " + options.level);
         return this.each(function() {
             var view = $(this).data("view");
@@ -810,6 +890,20 @@ var methods = {
             view.pan.leveldest = options.level;
         });
     },
+
+/*
+    ///////////////////////////////////////////////////////////////////////////////////
+    // use this to jump to the destination pos / zoom
+    setpos: function (options) {
+        return this.each(function() {
+            var layer = $(this).data("layer");
+            var view = $(this).data("view");
+            layer.xpos = options.x;
+            layer.ypos = options.y;
+            layer.level = Math.round(options.level); //TODO process sub decimal value
+        });
+    },
+*/
 
     ///////////////////////////////////////////////////////////////////////////////////
     // use this to animate the view (or zoom)

@@ -10,7 +10,7 @@ line-height: 0%; /*without this, there will be a weird bottom space..*/
 width: 120px;
 position: absolute;
 font-size: 9pt;
-bottom: 8px;
+top: 8px;
 right: 7px;
 }
 /*
