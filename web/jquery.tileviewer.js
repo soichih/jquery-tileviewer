@@ -84,10 +84,12 @@ var methods = {
                     thumb: null, //thumbnail image
                     
                     loader: {
-                        loading: 0, //actualy number of images that are currently loaded
+                        loading: 0, //actual number of images that are currently loaded
                         max_loading: 6, //max number of image that can be loaded simultaneously
+                        max_queue: 20, //max number of images that can be queued to be loaded
+                        queue: [], //FIFO queue for requested images
                         tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
-                        max_tiles: 100 //max number of images that can be stored in tiles dictionary
+                        max_tiles: 200 //max number of images that can be stored in tiles dictionary
                     },
                     tiles: [] //tiles dictionary 
                 }; //layer definition
@@ -171,6 +173,7 @@ var methods = {
                                     " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
                                 "<br>framerate: " + view.framerate + 
                                 "<br>images loading: " + layer.loader.loading + 
+                                "<br>images requested: " + layer.loader.queue.length + 
                                 "<br>tiles in dict: " + layer.loader.tile_count + 
                                 "<br>x:" + pixel_pos.x + 
                                 "<br>y:" + pixel_pos.y  
@@ -234,20 +237,22 @@ var methods = {
                             } else {
                                 ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                             }
+                            img.access_timestamp = new Date().getTime();//update last access timestamp
                         }
 
                         if(img == null) {
                             view.loader_request(url);
                         } else {
                             if(img.loaded) {
-                                img.timestamp = new Date().getTime();
-                                dodraw(); //good.. we have the image.. dodraw
+                                //good.. we have the image.. dodraw
+                                dodraw(); 
                                 return;
-                            } else {
-                                //not loaded yet ... update timestamp so that this image will get loaded soon
-                                img.timestamp = new Date().getTime();
+                            } else if(!img.loading) {
+                                //not loaded yet ... re-request using the same image
+                                view.loader_request(url, img);
                             }
                         }
+                        view.loader_process();
 
                         //meanwhile .... draw subtile instead
                         var xsize = layer.tilesize;
@@ -285,7 +290,7 @@ var methods = {
                                     ctx.drawImage(img, sx, sy, sw, sh, 
                                         layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 }
-                                img.timestamp = new Date().getTime();//we should keep this image.. 
+                                img.access_timestamp = new Date().getTime();
                                 return;
                             }
                             //try another level
@@ -299,54 +304,49 @@ var methods = {
 */
                     },
 
-                    loader_request: function(url) {
-                        var img = new Image();
-                        img.loaded = false;
-                        img.loading = false;
-                        img.level_loaded_for = layer.level;
-                        img.request_src = url;
-                        img.timestamp = new Date().getTime();
-                        img.onload = function() {
-                            this.loaded = true;
-                            this.loading = false;
-                            if(this.level_loaded_for == layer.level) {
-                                view.needdraw = true;
-                            }
-                            //console.log("done loading" + this.src);
-                            layer.loader.loading--;
-                            view.loader_load(null);
-                        };
-                        layer.tiles[url] = img;
-                        layer.loader.tile_count++;
-                        view.loader_load(img);
-                        view.loader_shift();
-                    },
-                    loader_load: function(img) {
-                        //if we can load more image, load it
-                        if(layer.loader.loading < layer.loader.max_loading) {
-                            if(img == null) {
-                                //find the latest image to load (unless specified)
-                                var latest_img = null;
-                                for (var url in layer.tiles) {
-                                    img = layer.tiles[url];
-                                    if(img.loaded == false && img.loading == false && (latest_img == null || img.timestamp > latest_img.timestamp)) {
-                                        latest_img = img;
-                                    }
+                    loader_request: function(url, img) {
+                        if(img == undefined) {
+                            //new image -- create
+                            var img = new Image();
+                            img.loaded = false;
+                            img.loading = false;
+                            img.level_loaded_for = layer.level;
+                            img.request_src = url;
+                            img.timestamp = new Date().getTime();
+                            img.onload = function() {
+                                this.loaded = true;
+                                this.loading = false;
+                                if(this.level_loaded_for == layer.level) {
+                                    view.needdraw = true;
                                 }
-                                img = latest_img;
-                            }
-                            if(img != null) {
-                                //start loading!
+                                layer.loader.loading--;
+                                view.loader_process();
+                            }; 
+                            layer.tiles[url] = img; //register in dictionary
+                            layer.loader.tile_count++;
+                        }
+
+                        //add it to the queue
+                        layer.loader.queue.push(img);
+                    },
+                    loader_process: function() {
+                        //if we can load more image, load it
+                        while(layer.loader.queue.length > 0 && layer.loader.loading < layer.loader.max_loading) {
+                            var img = layer.loader.queue.pop();
+                            if(img.loaded == false && img.loading == false) {
                                 img.src = img.request_src;
                                 layer.loader.loading++;
                                 img.loading = true;
-                                view.loader_load(); //recurse to see if we can load more image
                             }
                         }
-                    },
-                    loader_shift: function() {
-                        //if we have too many images in the dictionary... remove oldest used image
-                        if(layer.loader.tile_count >= layer.loader.max_tiles) {
+
+                        //if we have too many requests, shift old ones out.
+                        while(layer.loader.queue.length >= layer.loader.max_queue) {
+                            layer.loader.queue.shift();
+                        }
+
+                        //if we have too many images in the tiles ... remove last accessed image
+                        while(layer.loader.tile_count >= layer.loader.max_tiles) {
                             var oldest_img = null;
                             for (var url in layer.tiles) {
                                 img = layer.tiles[url];
@@ -355,7 +355,6 @@ var methods = {
                                 }
                             }
                             if(oldest_img != null) {
-                                //get rid of this guy
                                 delete layer.tiles[oldest_img.src];
                                 layer.loader.tile_count--;
                             }
@@ -626,6 +625,7 @@ var methods = {
                         //cache level0 image (so that we don't have to use the green rect too long..)
                         var url = options.src+"/level"+layer.info._maxlevel+"/0.png";
                         view.loader_request(url);
+                        view.loader_process();
 
                         view.recalc_viewparams();
                         view.needdraw = true;
