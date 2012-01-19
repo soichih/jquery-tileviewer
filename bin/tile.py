@@ -119,11 +119,12 @@ def tile(source_image, tile_dir):
 
         processing_image = dest_image
 
-    print "creating thumnail from last processing image"
-    cmd = "gm convert "+processing_image+" -normalize -size 128x128 -resize 128x128 +profile \"*\" "+tile_dir+"/thumb.png"
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    for line in proc.stdout.readlines():
-        print line.strip()
+    #tileviewer doesn't need this anymore (it will use the smallest tile as thumb)
+    #print "creating thumnail from last processing image"
+    #cmd = "gm convert "+processing_image+" -normalize -size 128x128 -resize 128x128 +profile \"*\" "+tile_dir+"/thumb.png"
+    #proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #for line in proc.stdout.readlines():
+    #    print line.strip()
 
     print "creating info.json"
     cmd = "gm identify "+source_image

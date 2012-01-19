@@ -55,6 +55,9 @@ var methods = {
             thumb_depth: 2 //level depth when thumb nail should appear
         };
 
+        var layer_defaults = {
+        };
+        
         return this.each(function() {
             var $this = $(this);
             options = $.extend(defaults, options);//override defaults with options
@@ -65,37 +68,10 @@ var methods = {
             //If the plugin hasn't been initialized yet..
             var view = $this.data("view");
             if(!view) {
-                var layer = {
-                    //json.info will be loaded here (static information about the image)
-                    info:  null, 
-
-                    //current view offset - not absolute pixel offset
-                    xpos: 0,
-                    ypos: 0,
-
-                    //number of tiles on the current level
-                    xtilenum: null,
-                    ytilenum: null,
-
-                    //current tile level/size (size is usually 128-256)
-                    level: null, 
-                    tilesize: null,
-
-                    thumb: null, //thumbnail image
-                    
-                    loader: {
-                        loading: 0, //actual number of images that are currently loaded
-                        max_loading: 6, //max number of image that can be loaded simultaneously
-                        max_queue: 20, //max number of images that can be queued to be loaded
-                        queue: [], //FIFO queue for requested images
-                        tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
-                        max_tiles: 200 //max number of images that can be stored in tiles dictionary
-                    },
-                    tiles: [] //tiles dictionary 
-                }; //layer definition
-                $this.data("layer", layer);
-
                 var view = {
+                    layers: [
+                        //you can add as many layers as you want.. layers[0] is master
+                    ],
                     canvas: document.createElement("canvas"),
                     status: document.createElement("p"),
                     mode: null, //current mouse left button mode (pan, sel2d, sel1d, etc..)
@@ -122,27 +98,42 @@ var methods = {
                     ///////////////////////////////////////////////////////////////////////////////////
                     // internal functions
                     draw: function() {
-                        view.needdraw = false;
-                        if(layer.info == null) { return; }
-
                         var start = new Date().getTime();
+                        view.needdraw = false;
 
                         var ctx = view.canvas.getContext("2d");
-                        view.canvas.width = $this.width();//clear
-                        //view.canvas.width = view.canvas.width;//clear
+                        view.canvas.width = $this.width();//clear canvas
 
-                        view.draw_tiles(ctx);
+                        if(view.layers.length > 0)  {
 
+                            for(var i=0; i<view.layers.length; i++) {
+                                var layer = view.layers[i];
+                                //if(layer.info == null) { continue; }
+                                view.draw_tiles(layer, ctx);
+                            }
+
+                            var master_layer = view.layers[0];
+                            view.draw_mode(master_layer, ctx);
+                        }
                         if(options.magnifier) {
                             view.draw_magnifier(ctx);
                         }
+                        
+                        //calculate framerate
+                        var end = new Date().getTime();
+                        var time = end - start;
+                        view.framerate = Math.round(1000/time);
 
+                        view.update_status();
+                    },
+
+                    draw_mode: function(layer, ctx) {
                         switch(view.mode) {
                         case "pan":
                             if(options.thumbnail) {
                                 //only draw thumbnail if we are zoomed in far enough
                                 if(layer.info._maxlevel - layer.level > options.thumb_depth) {
-                                    view.draw_thumb(ctx);
+                                    view.draw_thumb(layer, ctx);
                                 }
                             }
                             break;
@@ -153,37 +144,39 @@ var methods = {
                             view.draw_select_2d(ctx);
                             break;
                         }
-
-                        //calculate framerate
-                        var end = new Date().getTime();
-                        var time = end - start;
-                        view.framerate = Math.round(1000/time);
-
-                        view.update_status();
                     },
 
-                    //TODO - let user override this
                     update_status: function() {
+
                         if(options.debug) {
-                            var pixel_pos = view.client2pixel(view.xnow, view.ynow);
-                            $(view.status).html(
-                                "width: " + layer.info.width + 
-                                "<br>height: " + layer.info.height + 
-                                "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 + 
-                                    " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
-                                "<br>framerate: " + view.framerate + 
-                                "<br>images loading: " + layer.loader.loading + 
-                                "<br>images requested: " + layer.loader.queue.length + 
-                                "<br>tiles in dict: " + layer.loader.tile_count + 
-                                "<br>x:" + pixel_pos.x + 
-                                "<br>y:" + pixel_pos.y  
-                            );
+                            if(view.layers.length > 0) {
+                                var layer = view.layers[0]; //use master layer
+                                var pixel_pos = view.client2pixel(layer, view.xnow, view.ynow);
+                                var html = "";
+                                html += "<p>framerate: " + view.framerate + 
+                                    "<br>x:" + pixel_pos.x + 
+                                    "<br>y:" + pixel_pos.y + "</p>";
+
+                                for(var i=0; i<view.layers.length; i++) {
+                                    var layer = view.layers[i];
+                                    html += "<p>" +
+                                        "width: " + layer.info.width + 
+                                        "<br>height: " + layer.info.height + 
+                                        "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 + 
+                                            " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
+                                        "<br>images loading: " + layer.loader.loading + 
+                                        "<br>images requested: " + layer.loader.queue.length + 
+                                        "<br>tiles in dict: " + layer.loader.tile_count + 
+                                        "</p>"
+                                }
+                                $(view.status).html(html);
+                            }
                         } else {
                             $(view.status).empty();
                         }
                     },
 
-                    draw_tiles: function(ctx) {
+                    draw_tiles: function(layer, ctx) {
                         //display tiles
                         var xmin = Math.max(0, Math.floor(-layer.xpos/layer.tilesize));
                         var ymin = Math.max(0, Math.floor(-layer.ypos/layer.tilesize));
@@ -191,12 +184,12 @@ var methods = {
                         var ymax = Math.min(layer.ytilenum, Math.ceil((view.canvas.clientHeight-layer.ypos)/layer.tilesize));
                         for(var y = ymin; y < ymax; y++) {
                             for(var x  = xmin; x < xmax; x++) {
-                                view.draw_tile(ctx,x,y);
+                                view.draw_tile(layer, ctx,x,y);
                             }
                         }
                     },
 
-                    draw_thumb: function(ctx) {
+                    draw_thumb: function(layer, ctx) {
                         /*
                         //set shadow
                         ctx.shadowOffsetX = 3;
@@ -209,16 +202,16 @@ var methods = {
                         ctx.drawImage(layer.thumb, 0, 0, layer.thumb.width, layer.thumb.height);
 
                         //draw current view
-                        var rect = view.get_viewpos();
+                        var rect = view.get_viewpos(layer);
                         var factor = layer.thumb.height/layer.info.height;
                         ctx.strokeStyle = '#f00'; 
                         ctx.lineWidth   = 1;
                         ctx.strokeRect(rect.x*factor, rect.y*factor, rect.width*factor, rect.height*factor);
                     },
 
-                    draw_tile: function(ctx,x,y) {
+                    draw_tile: function(layer, ctx,x,y) {
                         var tileid = x + y*layer.xtilenum;
-                        var url = options.src+"/level"+layer.level+"/"+tileid+".png";
+                        var url = layer.src+"/level"+layer.level+"/"+tileid+".png";
                         var img = layer.tiles[url];
 
                         var dodraw = function() {
@@ -241,7 +234,7 @@ var methods = {
                         }
 
                         if(img == null) {
-                            view.loader_request(url);
+                            view.loader_request(layer, url);
                         } else {
                             if(img.loaded) {
                                 //good.. we have the image.. dodraw
@@ -249,10 +242,10 @@ var methods = {
                                 return;
                             } else if(!img.loading) {
                                 //not loaded yet ... re-request using the same image
-                                view.loader_request(url, img);
+                                view.loader_request(layer, url, img);
                             }
                         }
-                        view.loader_process();
+                        view.loader_process(layer);
 
                         //meanwhile .... draw subtile instead
                         var xsize = layer.tilesize;
@@ -270,7 +263,7 @@ var methods = {
                             factor <<=1;
                             var xtilenum_up = Math.ceil(layer.info.width/Math.pow(2,layer.level+down)/layer.info.tilesize);
                             var subtileid = Math.floor(x/factor) + Math.floor(y/factor)*xtilenum_up;
-                            var url = options.src+"/level"+(layer.level+down)+"/"+subtileid+".png";
+                            var url = layer.src+"/level"+(layer.level+down)+"/"+subtileid+".png";
                             var img = layer.tiles[url];
                             if(img && img.loaded) {
                                 //crop the source section
@@ -297,14 +290,15 @@ var methods = {
                             down++;
                         }
 
-/* let's not do anything 
+                        //console.log("subtile miss on layer:" + layer.src);
+                        /* let's not do anything - I needed while debugging mostly
                         //nosubtile available.. draw empty rectangle as the last resort
                         ctx.fillStyle = options.empty;
                         ctx.fillRect(layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize, ysize);
-*/
+                        */
                     },
 
-                    loader_request: function(url, img) {
+                    loader_request: function(layer, url, img) {
                         if(img == undefined) {
                             //new image -- create
                             var img = new Image();
@@ -317,19 +311,26 @@ var methods = {
                                 this.loaded = true;
                                 this.loading = false;
                                 if(this.level_loaded_for == layer.level) {
+                                    //ideally, I'd like to just draw the tile that got loaded,
+                                    //but since I now support layering, I need to redraw the whole thing..
+                                    //This means that tons of unnecessary image request will be made whenever
+                                    //a lot of tiles are loaded simultanously
                                     view.needdraw = true;
                                 }
                                 layer.loader.loading--;
-                                view.loader_process();
-                            }; 
+                                view.loader_process(layer);
+                                //console.log(img.src + " loaded");
+                            };
                             layer.tiles[url] = img; //register in dictionary
                             layer.loader.tile_count++;
+                            //console.log("requesting " + url + " on " + layer.master);
                         }
 
                         //add it to the queue
                         layer.loader.queue.push(img);
+                        return img;
                     },
-                    loader_process: function() {
+                    loader_process: function(layer) {
                         //if we can load more image, load it
                         while(layer.loader.queue.length > 0 && layer.loader.loading < layer.loader.max_loading) {
                             var img = layer.loader.queue.pop();
@@ -342,7 +343,7 @@ var methods = {
 
                         //if we have too many requests, shift old ones out.
                         while(layer.loader.queue.length >= layer.loader.max_queue) {
-                            layer.loader.queue.shift();
+                            var img = layer.loader.queue.shift();
                         }
 
                         //if we have too many images in the tiles ... remove last accessed image
@@ -364,12 +365,15 @@ var methods = {
                     draw_magnifier:  function(ctx) {
                         //grab magnifier image
                         var mcontext = view.magnifier_canvas.getContext("2d");
-                        var marea = ctx.getImageData(view.xnow-options.magnifier_view_area/2, view.ynow-options.magnifier_view_area/2, options.magnifier_view_area,options.magnifier_view_area);
+                        var marea = ctx.getImageData(
+                            view.xnow-options.magnifier_view_area/2, 
+                            view.ynow-options.magnifier_view_area/2, 
+                            options.magnifier_view_area,
+                            options.magnifier_view_area);
                         mcontext.putImageData(marea, 0,0);//draw to canvas so that I can zoom it up
 
                         //display on the bottom left corner
                         ctx.drawImage(view.magnifier_canvas, 0, view.canvas.clientHeight-options.magnifier_view_size, options.magnifier_view_size, options.magnifier_view_size);
-
                     },
 
                     draw_select_1d: function(ctx) {
@@ -433,7 +437,7 @@ var methods = {
 
                     },
 
-                    recalc_viewparams: function() {
+                    recalc_viewparams: function(layer) {
                         var factor = Math.pow(2,layer.level);
 
                         //calculate number of tiles on current level
@@ -448,7 +452,7 @@ var methods = {
                     },
 
                     //get current pixel coordinates of the canvas window
-                    get_viewpos: function() {
+                    get_viewpos: function(layer) {
                         var factor = Math.pow(2, layer.level)*layer.info.tilesize/layer.tilesize;
                         return {
                             x: -layer.xpos*factor,
@@ -459,7 +463,7 @@ var methods = {
                     },
 
                     //calculate pixel position based on client x/y
-                    client2pixel: function(client_x, client_y) {
+                    client2pixel: function(layer, client_x, client_y) {
                         var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
                         var pixel_x = Math.round((client_x - layer.xpos)*factor);
                         var pixel_y = Math.round((client_y - layer.ypos)*factor);
@@ -467,15 +471,16 @@ var methods = {
                     },
 
                     //calculate pixel potision on the center
-                    center_pixelpos: function() {
-                        return view.client2pixel(view.canvas.clientWidth/2, view.canvas.clientHeight/2);
+                    center_pixelpos: function(layer) {
+                        return view.client2pixel(layer, view.canvas.clientWidth/2, view.canvas.clientHeight/2);
                     },
 
-                    change_zoom: function(delta, x, y) {
-
-                        //ignore if we've reached min/max zoom
-                        if(layer.level == 0 && layer.tilesize+delta > layer.info.tilesize*options.maximum_pixelsize) return false;
-                        if(layer.level == layer.info._maxlevel && layer.tilesize+delta < layer.info.tilesize/2) return false;
+                    change_zoom: function(layer, delta, x, y) {
+                        if(layer.master == true) {
+                            //ignore if we've reached min/max zoom
+                            if(layer.level == 0 && layer.tilesize+delta > layer.info.tilesize*options.maximum_pixelsize) return false;
+                        }
+                        if(layer.level == layer.info._maxlevel-1 && layer.tilesize+delta < layer.info.tilesize/2) return false;
 
                         //*before* changing tilesize, adjust offset so that we will zoom into where the cursor is
                         var dist_from_x0 = x - layer.xpos;
@@ -491,53 +496,55 @@ var methods = {
                             if(layer.level != 0) {
                                 layer.level--;
                                 layer.tilesize /= 2; //we can't use bitoperation here.. need to preserve floating point
-                                view.recalc_viewparams();
+                                view.recalc_viewparams(layer);
                             }
                         }
                         if(layer.tilesize < layer.info.tilesize/2) { //level up
                             if(layer.level != layer.info._maxlevel) {
                                 layer.level++;
                                 layer.tilesize *= 2; //we can't use bitoperation here.. need to preserve floating point
-                                view.recalc_viewparams();
+                                view.recalc_viewparams(layer);
                             }
                         }
-
-                        view.needdraw = true;
+                        return true;
                     },
 
                     pan: function() {
-                        var factor = Math.pow(2,layer.level)*layer.info.tilesize/layer.tilesize;
-                        var xdest_client = view.pan.xdest/factor + layer.xpos;
-                        var ydest_client = view.pan.ydest/factor + layer.ypos;
-                        var center = view.center_pixelpos();
-                        var dx = center.x - view.pan.xdest;
-                        var dy = center.y - view.pan.ydest;
-                        var dist = Math.sqrt(dx*dx + dy*dy);
+                        for(var i=0; i<view.layers.length; i++) {
+                            var layer = view.layers[i];
 
-                        //Step 1) if destination is not in client view - zoom out until we do (or we can't zoom out anymore)
-                        if(layer.level != layer.info._maxlevel && 
-                            (xdest_client < 0 || ydest_client < 0 || xdest_client > view.canvas.clientWidth || ydest_client > view.canvas.clientHeight)) {
-                            view.change_zoom(-5, view.canvas.clientWidth/2 + dx/dist*factor*50, view.canvas.clientHeight/2 + dy/dist*factor*50);
-                        } else {
-                            //Step 2a) Pan to destination
-                           if(dist >= factor) {
-                                layer.xpos += dx / factor / 10;
-                                layer.ypos += dy / factor / 10;
-                            }
+                            var factor = Math.pow(2,layer.level)*layer.info.tilesize/layer.tilesize;
+                            var xdest_client = view.pan.xdest/factor + layer.xpos;
+                            var ydest_client = view.pan.ydest/factor + layer.ypos;
+                            var center = view.center_pixelpos(layer);
+                            var dx = center.x - view.pan.xdest;
+                            var dy = center.y - view.pan.ydest;
+                            var dist = Math.sqrt(dx*dx + dy*dy);
 
-                            //Step 2b) Also, zoom in/out until destination level is reached
-                            var current_level = layer.level + layer.info.tilesize/layer.tilesize-1;
-                            var level_dist = Math.abs(view.pan.leveldest - current_level);
-                            if(level_dist >= 0.1) {
-                                var dzoom = 2;
-                                if(current_level < view.pan.leveldest) dzoom = -dzoom;
-                                view.change_zoom(dzoom, xdest_client*2 - view.canvas.clientWidth/2, ydest_client*2 - view.canvas.clientHeight/2);
-                            }
+                            //Step 1) if destination is not in client view - zoom out until we do (or we can't zoom out anymore)
+                            if(layer.level != layer.info._maxlevel && 
+                                (xdest_client < 0 || ydest_client < 0 || xdest_client > view.canvas.clientWidth || ydest_client > view.canvas.clientHeight)) {
+                                view.change_zoom(layer, -5, view.canvas.clientWidth/2 + dx/dist*factor*50, view.canvas.clientHeight/2 + dy/dist*factor*50);
+                            } else {
+                                //Step 2a) Pan to destination
+                               if(dist >= factor) {
+                                    layer.xpos += dx / factor / 10;
+                                    layer.ypos += dy / factor / 10;
+                                }
 
-                            if(dist < factor && level_dist < 0.1) {
-                                //reached destination
-                                console.log("reached");
-                                view.pan.xdest = null;
+                                //Step 2b) Also, zoom in/out until destination level is reached
+                                var current_level = layer.level + layer.info.tilesize/layer.tilesize-1;
+                                var level_dist = Math.abs(view.pan.leveldest - current_level);
+                                if(level_dist >= 0.1) {
+                                    var dzoom = 2;
+                                    if(current_level < view.pan.leveldest) dzoom = -dzoom;
+                                    view.change_zoom(layer, dzoom, xdest_client*2 - view.canvas.clientWidth/2, ydest_client*2 - view.canvas.clientHeight/2);
+                                }
+
+                                if(dist < factor && level_dist < 0.1) {
+                                    //reached destination
+                                    view.pan.xdest = null;
+                                }
                             }
                         }
                         view.needdraw = true;
@@ -585,6 +592,75 @@ var methods = {
                             view.select.x, view.select.y,
                             view.select.width, view.select.height)) return "inside";
                          return null;
+                    },
+
+                    addlayer: function(src) {
+                        //load info.json to master layer
+                        $.ajax({
+                            url: src+"/info.json",
+                            dataType: "json",
+                            success: function(data) {
+                                var layer = {
+                                    //json.info will be loaded here (static information about the image)
+                                    info:  data, 
+                                    src: src,
+
+                                    //current view offset - not absolute pixel offset
+                                    xpos: 0,
+                                    ypos: 0,
+
+                                    //number of tiles on the current level
+                                    xtilenum: null,
+                                    ytilenum: null,
+
+                                    //current tile level/size (size is usually 128-256)
+                                    level: null, 
+                                    tilesize: null,
+
+                                    thumb: null, //thumbnail image
+
+                                    //tile loader
+                                    loader: {
+                                        loading: 0, //actual number of images that are currently loaded
+                                        max_loading: 6, //max number of image that can be loaded simultaneously
+                                        max_queue: 20, //max number of images that can be queued to be loaded
+                                        queue: [], //FIFO queue for requested images
+                                        tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
+                                        max_tiles: 200 //max number of images that can be stored in tiles dictionary
+                                    },
+                                    tiles: []//tiles dictionary 
+                                };
+                                //first layer becomes master
+                                if(view.layers.length == 0) {
+                                    layer.master = true;
+                                } else {
+                                    layer.master = false;
+                                }
+                                view.layers.push(layer);
+
+                                //calculate metadata
+                                var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
+                                layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
+
+                                //set initial level/size to fit the entire view
+                                var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
+                                layer.level = layer.info._maxlevel - Math.floor(min) - 1;
+                                layer.tilesize = layer.info.tilesize/2;
+
+                                //center image
+                                var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
+                                layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
+                                layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
+
+                                //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
+                                var thumb_url = src+"/level"+layer.info._maxlevel+"/0.png";
+                                layer.thumb = view.loader_request(layer, thumb_url);
+                                view.loader_process(layer);
+
+                                view.recalc_viewparams(layer);
+                                view.needdraw = true;
+                            }
+                        });
                     }
                 };//view definition
                 $this.data("view", view);
@@ -601,49 +677,19 @@ var methods = {
                 $this.append(view.status);
                 methods.setmode.call($this, {mode: "pan"});
 
-                //load info.json
-                $.ajax({
-                    url: options.src+"/info.json",
-                    dataType: "json",
-                    success: function(data) {
-                        layer.info = data;
-
-                        //calculate metadata
-                        var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
-                        layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
-
-                        //set initial level/size to fit the entire view
-                        var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
-                        layer.level = layer.info._maxlevel - Math.floor(min) - 1;
-                        layer.tilesize = layer.info.tilesize/2;
-
-                        //center image
-                        var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
-                        layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
-                        layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
-
-                        //cache level0 image (so that we don't have to use the green rect too long..)
-                        var url = options.src+"/level"+layer.info._maxlevel+"/0.png";
-                        view.loader_request(url);
-                        view.loader_process();
-
-                        view.recalc_viewparams();
-                        view.needdraw = true;
-                    }
-                });
+                //add master layer
+                view.addlayer(options.src);
 
                 //setup magnifier canvas
                 view.magnifier_canvas.width = options.magnifier_view_area;
                 view.magnifier_canvas.height = options.magnifier_view_area;
 /*
-                //load image
-                view.icons.box = new Image();
-                view.icons.box.src = "images/box.png";
-*/
+
                 //load thumbnail
                 layer.thumb = new Image();
                 layer.thumb.src = options.src+"/thumb.png";
-
+*/
+/*
                 // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
                 // requestAnim shim layer by Paul Irish
                 window.requestAnimFrame = (function(){
@@ -652,7 +698,7 @@ var methods = {
                           window.mozRequestAnimationFrame    || 
                           window.oRequestAnimationFrame      || 
                           window.msRequestAnimationFrame     || 
-                          function(/* function */ callback, /* DOMElement */ element){
+                          function(callback, element){
                             window.setTimeout(callback, 1000 / 60);
                           };
                 })();
@@ -668,22 +714,21 @@ var methods = {
                     }
                 };
                 draw_thread();
+*/
 
-/*
                 //redraw thread
                 var draw_thread = function() {
                     if(view.pan.xdest) {
-                        pan();
+                        view.pan();
                     }
 
                     if(view.needdraw) {
-                        draw();
+                        view.draw();
                     }
                     //setTimeout(draw_thread, 30);
                 }
                 //read http://ejohn.org/blog/how-javascript-timers-work/
                 setInterval(draw_thread, 30);
-*/
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
@@ -693,6 +738,8 @@ var methods = {
                     var y = e.pageY - offset.top;
 
                     view.mousedown = true;
+
+                    var layer = view.layers[0];
 
                     //mode specific extra info
                     switch(view.mode) {
@@ -738,8 +785,6 @@ var methods = {
                     view.xnow = x;
                     view.ynow = y;
 
-                    if(layer.info == null) { return false; }
-
                     if(options.magnifier) {
                         //need to redraw magnifier
                         view.needdraw = true;
@@ -749,8 +794,11 @@ var methods = {
                         //dragging
                         switch(view.mode) {
                         case "pan":
-                            layer.xpos = x - view.pan.xhot;
-                            layer.ypos = y - view.pan.yhot;
+                            for(var i=0; i<view.layers.length; i++) {
+                                var layer = view.layers[i];
+                                layer.xpos = x - view.pan.xhot;
+                                layer.ypos = y - view.pan.yhot;
+                            }
                             view.draw();//TODO - should I call needdraw instead?
                             break;
                         case "select_1d":
@@ -836,11 +884,15 @@ var methods = {
 
                 $(view.canvas).bind("mousewheel.tileviewer", function(e, delta) {
                     view.pan.xdest = null;//cancel pan
-                    //if(view.mode == "pan") {
-                        delta = delta*options.zoom_sensitivity;
-                        var offset = $(view.canvas).offset();
-                        view.change_zoom(delta, e.pageX - offset.left, e.pageY - offset.top);
-                    //}
+                    delta = delta*options.zoom_sensitivity;
+                    var offset = $(view.canvas).offset();
+                    
+                    for(var i=0; i<view.layers.length; i++) {
+                        var layer = view.layers[i];
+                        //if master fails to zoom any further, don't zoom other layers
+                        if(!view.change_zoom(layer, delta, e.pageX - offset.left, e.pageY - offset.top)) break;
+                    }
+                    view.needdraw = true;
                     return false;
                 });
             } else {
@@ -860,6 +912,15 @@ var methods = {
         });
     },
 */
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    // call this if everytime you resize the container (TODO - can't it be automated?)
+    addlayer: function (options) {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.addlayer(options.src);
+        });
+    },
 
     ///////////////////////////////////////////////////////////////////////////////////
     // call this if everytime you resize the container (TODO - can't it be automated?)
@@ -886,7 +947,6 @@ var methods = {
     ///////////////////////////////////////////////////////////////////////////////////
     // use this to animate the view (or zoom)
     pan: function (options) {
-        console.log("requested level " + options.level);
         return this.each(function() {
             var view = $(this).data("view");
             view.pan.xdest = options.x;
@@ -914,8 +974,8 @@ var methods = {
     getpos: function () {
         //get current position
         var view = $(this).data("view");
-        var layer = $(this).data("layer");
-        var pos = view.center_pixelpos();
+        var layer = view.layers[0];
+        var pos = view.center_pixelpos(layer);
         pos.level = Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*1000)/1000;
         return pos;
     },
