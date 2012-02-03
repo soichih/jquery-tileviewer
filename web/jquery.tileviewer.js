@@ -48,7 +48,7 @@ var methods = {
             magnifier: false,//display magnifier
             debug: true,
             pixel: true,
-            magnifier_view_size: 128, //view size
+            magnifier_view_size: 200, //view size
             magnifier_view_area: 32, //pixel w/h sizes to zoom
             graber_size: 12, //size of the grabber area
             maximum_pixelsize: 1,//set this to >1 if you want to let user to zoom image after reaching its original resolution (also consider using magnifier..)
@@ -111,13 +111,13 @@ var methods = {
                                     view.draw_tiles(layer, ctx);
                                 }
                             }
+                            if(options.magnifier) {
+                                view.draw_magnifier(ctx);
+                            }
                             var master_layer = view.layers[0];
                             if(master_layer.info) {
                                 view.draw_mode(master_layer, ctx);
                             }
-                        }
-                        if(options.magnifier) {
-                            view.draw_magnifier(ctx);
                         }
                         
                         //calculate framerate
@@ -172,7 +172,7 @@ var methods = {
                                             "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 + 
                                                 " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
                                             "<br>images loading: " + layer.loader.loading + 
-                                            "<br>images requested: " + layer.loader.queue.length + 
+                                            "<br>request queue: " + layer.loader.queue.length + 
                                             "<br>tiles in dict: " + layer.loader.tile_count + 
                                             "</p>"
                                     }
@@ -334,7 +334,14 @@ var methods = {
                             //console.log("requesting " + url + " on " + layer.master);
                         }
 
-                        //add it to the queue
+                        //remove if already requested (so that I can add it back at the top)
+                        for(id in layer.loader.queue) {
+                            var request = layer.loader.queue[id];
+                            if(request === img) {
+                                layer.loader.queue = layer.loader.queue.splice(id, 1);
+                                break;
+                            }
+                        } 
                         layer.loader.queue.push(img);
                         return img;
                     },
@@ -561,7 +568,7 @@ var methods = {
                             var current_level = layer.level + layer.info.tilesize/layer.tilesize-1;
                             var level_dist = Math.abs(view.pan.leveldest - current_level);
                             if(level_dist >= 0.1) {
-                                var dzoom = 2;
+                                var dzoom = 4;
                                 if(current_level < view.pan.leveldest) dzoom = -dzoom;
                                 view.change_zoom(dzoom, xdest_client*2 - view.canvas.clientWidth/2, ydest_client*2 - view.canvas.clientHeight/2);
                             }
@@ -751,7 +758,7 @@ var methods = {
                     //setTimeout(draw_thread, 30);
                 }
                 //read http://ejohn.org/blog/how-javascript-timers-work/
-                setInterval(draw_thread, 30);
+                setInterval(draw_thread, 20);
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
