@@ -46,7 +46,7 @@ var methods = {
             zoom_sensitivity: 32, 
             thumbnail: true,//display thumbnail
             magnifier: false,//display magnifier
-            debug: true,
+            debug: false,
             pixel: true,
             magnifier_view_size: 200, //view size
             magnifier_view_area: 32, //pixel w/h sizes to zoom
@@ -92,8 +92,15 @@ var methods = {
                     xnow: null,
                     ynow: null,
                     mousedown: false,
+                    mousedown_r: false,//right mouse button
                     drawmsec: null, //milli seconds tool to draw a frame
                     needdraw: false, //flag used to request for frameredraw 
+
+                    //plugins support
+                    plugins: [],
+                    callback_mousedown: [],
+                    callback_mouseup: [],
+                    callback_mousemove: [],
 
                     ///////////////////////////////////////////////////////////////////////////////////
                     // internal functions
@@ -105,18 +112,48 @@ var methods = {
                         view.canvas.width = $this.width();//clear canvas
 
                         if(view.layers.length > 0)  {
-                            for(var i=0; i<view.layers.length; i++) {
-                                var layer = view.layers[i];
-                                if(layer.enable) {
-                                    view.draw_tiles(layer, ctx);
+                            //draw master layer
+                            var master_layer = view.layers[0];
+                            view.draw_tiles(master_layer, ctx);
+
+                            //apply layer plugins
+                            var imagedata = null;
+                            for(var i=0;i<view.plugins.length; i++) {
+                                var plugin = view.plugins[i];
+                                if(plugin.enable) {
+                                    if(imagedata == null) {
+                                        imagedata = ctx.getImageData(0,0,view.canvas.width, view.canvas.height);
+                                    }
+                                    plugin.layer.call(view, ctx, imagedata);
                                 }
                             }
+                            //blit
+                            if(imagedata != null) {
+                                ctx.putImageData(imagedata,0,0);
+                            }
+
+                            //draw overlays
+                            for(var i=1; i<view.layers.length; i++) {
+                                var overlay_layer = view.layers[i];
+                                if(overlay_layer.enable) {
+                                    view.draw_tiles(overlay_layer, ctx);
+                                }
+                            }
+
+                            //draw views
                             if(options.magnifier) {
                                 view.draw_magnifier(ctx);
                             }
-                            var master_layer = view.layers[0];
                             if(master_layer.info) {
                                 view.draw_mode(master_layer, ctx);
+                            }
+
+                            //apply tool plugins
+                            for(var i=0;i<view.plugins.length; i++) {
+                                var plugin = view.plugins[i];
+                                if(plugin.enable) {
+                                    plugin.draw.call(view, ctx);
+                                }
                             }
                         }
                         
@@ -161,6 +198,7 @@ var methods = {
                                         "<br>x:" + pixel_pos.x + 
                                         "<br>y:" + pixel_pos.y + "</p>";
                                 }
+                                //html += "level min: "+ view.level.min+"<br>level max: " + view.level.max + "<br>";
 
                                 for(var i=0; i<view.layers.length; i++) {
                                     var layer = view.layers[i];
@@ -385,10 +423,17 @@ var methods = {
                             view.ynow-options.magnifier_view_area/2, 
                             options.magnifier_view_area,
                             options.magnifier_view_area);
+
                         mcontext.putImageData(marea, 0,0);//draw to canvas so that I can zoom it up
 
                         //display on the bottom left corner
                         ctx.drawImage(view.magnifier_canvas, 0, view.canvas.clientHeight-options.magnifier_view_size, options.magnifier_view_size, options.magnifier_view_size);
+                        /*
+                        //display where the cursor is
+                        ctx.drawImage(view.magnifier_canvas, 
+                            view.xnow-options.magnifier_view_size/2, view.ynow-options.magnifier_view_size/2, 
+                            options.magnifier_view_size, options.magnifier_view_size);
+                        */
                     },
 
                     draw_select_1d: function(ctx) {
@@ -767,44 +812,65 @@ var methods = {
                     var x = e.pageX - offset.left;
                     var y = e.pageY - offset.top;
 
-                    view.mousedown = true;
+                    if(e.button != 2) { //not right button
+                        view.mousedown = true;
 
-                    var layer = view.layers[0];
+                        var layer = view.layers[0];
 
-                    //mode specific extra info
-                    switch(view.mode) {
-                    case "pan":
-                        view.pan.xdest = null;//cancel pan
-                        view.pan.xhot = x - layer.xpos;
-                        view.pan.yhot = y - layer.ypos;
-                        document.body.style.cursor="move";
-                        break;
-                    case "select_1d":
-                        view.select.item = view.hittest_select_1d(x,y);
-                        break;
-                    case "select_2d":
-                        view.select.item = view.hittest_select_2d(x,y);
+                        //mode specific extra info
+                        switch(view.mode) {
+                        case "pan":
+                            view.pan.xdest = null;//cancel pan
+                            view.pan.xhot = x - layer.xpos;
+                            view.pan.yhot = y - layer.ypos;
+                            document.body.style.cursor="move";
+                            break;
+                        case "select_1d":
+                            view.select.item = view.hittest_select_1d(x,y);
+                            break;
+                        case "select_2d":
+                            view.select.item = view.hittest_select_2d(x,y);
+                        }
+                        switch(view.mode) {
+                        case "select_1d":
+                        case "select_2d":
+                            view.select.xhot = x - view.select.x;
+                            view.select.yhot = y - view.select.y;
+                            view.select.whot = x - view.select.width;
+                            view.select.hhot = y - view.select.height;
+                            view.select.xprev = view.select.x;
+                            view.select.yprev = view.select.y;
+                            view.select.wprev = view.select.width;
+                            view.select.hprev = view.select.height;
+                            break;
+                        }
                     }
-                    switch(view.mode) {
-                    case "select_1d":
-                    case "select_2d":
-                        view.select.xhot = x - view.select.x;
-                        view.select.yhot = y - view.select.y;
-                        view.select.whot = x - view.select.width;
-                        view.select.hhot = y - view.select.height;
-                        view.select.xprev = view.select.x;
-                        view.select.yprev = view.select.y;
-                        view.select.wprev = view.select.width;
-                        view.select.hprev = view.select.height;
-                        break;
+
+                    //pass to plugins
+                    for(var i=0;i<view.callback_mousedown.length; i++) {
+                        var callback = view.callback_mousedown[i];
+                        callback.call(view, e, x,y);
                     }
+
+                    return false;
+                });
+
+                //disable contextmenu 
+                $(view.canvas).contextmenu(function(e) {
                     return false;
                 });
 
                 //we want to capture mouseup on whole doucument - not just canvas
-                $(document).mouseup(function(){
+                $(document).mouseup(function(e){
                     document.body.style.cursor="auto";
                     view.mousedown = false;
+
+                    //pass to plugins
+                    for(var i=0;i<view.callback_mouseup.length; i++) {
+                        var callback = view.callback_mouseup[i];
+                        callback.call(view, e);
+                    }
+
                     return false;
                 });
 
@@ -907,8 +973,12 @@ var methods = {
                         }
                     }
 
-                    view.update_status(); //mouse position change doesn't cause view udpate.. so I have to call this 
+                    for(var i=0;i<view.callback_mousemove.length; i++) {
+                        var callback = view.callback_mousemove[i];
+                        callback.call(view, e, x,y);
+                    }
 
+                    view.update_status(); //mouse position change doesn't cause view udpate.. so I have to call this 
                     return false;
                 });
 
@@ -944,6 +1014,32 @@ var methods = {
         return this.each(function() {
             var view = $(this).data("view");
             view.addlayer(options.id, options.src, options.enable);
+        });
+    },
+
+    addplugin: function(plugin) {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.plugins.push(plugin);
+        });
+    },
+
+    addcallback_mousedown: function(callback) {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.callback_mousedown.push(callback);
+        });
+    },
+    addcallback_mouseup: function(callback) {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.callback_mouseup.push(callback);
+        });
+    },
+    addcallback_mousemove: function(callback) {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.callback_mousemove.push(callback);
         });
     },
 
@@ -1019,6 +1115,12 @@ var methods = {
         var pos = view.center_pixelpos(layer);
         pos.level = Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*1000)/1000;
         return pos;
+    },
+    redraw: function() {
+        return this.each(function() {
+            var view = $(this).data("view");
+            view.needdraw = true;
+        });
     },
 
     ///////////////////////////////////////////////////////////////////////////////////
