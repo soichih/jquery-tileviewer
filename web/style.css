@@ -1,6 +1,7 @@
 body {
-padding: 0px;
+padding: 25px;
 margin: 0px;
+font-family: Helvetica;
 }
 .tileviewer {
 width: 800px;
