@@ -106,6 +106,7 @@ var methods = {
 
                         var ctx = view.canvas.getContext("2d");
                         view.canvas.width = $this.width();//clear canvas
+                        view.canvas.height = $this.height();//clear canvas
 
                         if(view.layers.length > 0)  {
                             //draw master layer
@@ -1067,8 +1068,8 @@ var methods = {
     resize: function (options) {
         return this.each(function() {
             var view = $(this).data("view");
-            view.canvas.width = options.width;
-            view.canvas.height = options.height;
+            //view.canvas.width = options.width;
+            //view.canvas.height = options.height;
             view.needdraw = true;
         });
     },
