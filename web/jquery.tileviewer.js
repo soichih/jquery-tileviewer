@@ -739,7 +739,6 @@ var methods = {
                 //setup views
                 $this.addClass("tileviewer");
                 $(view.canvas).css("background-color", "#222");
-
                 $(view.canvas).css("width", "100%");
                 $(view.canvas).css("height", "100%");
 
