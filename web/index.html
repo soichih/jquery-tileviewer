@@ -1,146 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <script src="http://jqueryjs.googlecode.com/files/jquery-1.3.2.min.js"></script>
-    <script src="http://tileviewer.googlecode.com/files/jquery.mousewheel.js"></script>
-<!--
-    <script src="http://tileviewer.googlecode.com/files/jquery.tileviewer.js"></script>
-    <link rel="stylesheet" href="http://tileviewer.googlecode.com/files/jquery.tileviewer.css" type="text/css" media="all"  /> 
--->
 
-    <link rel="stylesheet" href="jquery.tileviewer.css" type="text/css" media="all"  /> 
-    <link rel="stylesheet" href="all.css" type="text/css" media="all"  /> 
-    <script src="jquery.tileviewer.js"></script> 
-    <style>
-    body {
-    margin-left: 50px;
-    }
-    .pan {
-        text-decoration: underline;
-        cursor: pointer;
-    }
-    table {
-    border-collapse: collapse;
-    }
-    table td {
-        vertical-align: top;
-    }
-    </style>
+<link rel="stylesheet" href="https://raw.github.com/soichih/TileViewer/master/web/jquery.tileviewer.css" type="text/css" media="all"  /> 
+<style>
+body {
+margin-left: 50px;
+}
+.pan {
+text-decoration: underline;
+cursor: pointer;
+}
+table {
+border-collapse: collapse;
+}
+table td {
+vertical-align: top;
+}
+</style>
 
 </head>
 <body>
-<h1>TileViewer Demo</h1>
+    <h1>TileViewer Demo</h1>
 
-Machine
-<table><tr>
-<td>
-    <div id="machine"></div>
-</td>
-<td>
-    <h2>Goto..</h2>
-    <span id="pan_handle" class="pan">handle</span><br>
-    <span id="pan_circle" class="pan">circle</span><br>
-    <span id="pan_bottom" class="pan">bottom tip</span><br>
+    <div id="eso1208a"></div>
 
-    <h2>Switch Mode</h2>
-    <span id="mode_pan" class="pan">pan</span><br>
-    <span id="mode_select_1d" class="pan">1d select</span><br>
-    <span id="mode_select_2d" class="pan">2d select</span><br>
-    
-</td>
-</tr></table>
-
-Duplicate Test 1
-<table><tr>
-<td>
-    <div class="tv1"></div>
-</td>
-<td>
-TODO..
-</td>
-</tr></table>
-
-Duplicate Test 2
-<table><tr>
-<td>
-    <div class="tv1"></div>
-</td>
-<td>
-TODO..
-</td>
-</tr></table>
-
-FITS (deep lens survey)
-<table><tr>
-<td>
-    <div id="tv2"></div>
-</td>
-<td>
-TODO..
-</td>
-</tr></table>
-
-Aerial
-<table><tr>
-<td>
-    <div id="tv3"></div>
-</td>
-<td>
-TODO..
-</td>
-</tr></table>
-
-<script>
-$(function() {
-    $("#machine").tileviewer({
-        src: "tiles/odi",
-        width: 800,
-        height: 400,
-        magnifier: true
-    });
-
-    $(".tv1").tileviewer(); //use default
-    $("#tv2").tileviewer({
-        src: "tiles/deep_lens_survey",
-        width: 500,
-        height: 400
-    });
-    $("#tv3").tileviewer({
-        src: "tiles/aerial",
-        width: 600,
-        height: 300
-    });
-    $("#pan_handle").click(function() {
-        $("#machine").tileviewer("pan", {
-            x: 4640,
-            y: 1666,
-            level: 0
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="https://raw.github.com/soichih/TileViewer/master/web/jquery.mousewheel.js"></script>
+    <script src="https://raw.github.com/soichih/TileViewer/master/web/jquery.tileviewer.js.js"></script>
+    <script>
+    $(function() {
+        $("#eso1208a").tileviewer({
+            src: "eso1208a",
+            width: 800,
+            height: 400,
+            magnifier: true
         });
-    });
-    $("#pan_circle").click(function() {
-        $("#machine").tileviewer("pan", {
-            x: 1500,
-            y: 5200,
-            level: 3
-        });
-    });
-    $("#pan_bottom").click(function() {
-        $("#machine").tileviewer("pan", {
-            x: 3270,
-            y: 7740,
-            level: 0 
-        });
-    });
-    $("#mode_pan").click(function() {
-        $("#machine").tileviewer("setmode", {mode:"pan"});
-    });
-    $("#mode_select_1d").click(function() {
-        $("#machine").tileviewer("setmode", {mode:"select_1d"});
-    });
-    $("#mode_select_2d").click(function() {
-        $("#machine").tileviewer("setmode", {mode:"select_2d"});
-    });
-})
-</script>
+    })
+    </script>
 </body>
 </html>

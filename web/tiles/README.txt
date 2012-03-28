@@ -1,1 +1,0 @@
-If you are expecting tile directories here (but you don't see any) that's because you haven't ran tile.py command yet. You need to convert your image into tiles using tile.py and this is the directory where those tile pyramids are stored under each subdirectories.

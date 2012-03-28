@@ -96,11 +96,7 @@ var methods = {
                     drawmsec: null, //milli seconds tool to draw a frame
                     needdraw: false, //flag used to request for frameredraw 
 
-                    //plugins support
                     plugins: [],
-                    callback_mousedown: [],
-                    callback_mouseup: [],
-                    callback_mousemove: [],
 
                     ///////////////////////////////////////////////////////////////////////////////////
                     // internal functions
@@ -124,7 +120,7 @@ var methods = {
                                     if(imagedata == null) {
                                         imagedata = ctx.getImageData(0,0,view.canvas.width, view.canvas.height);
                                     }
-                                    plugin.layer.call(view, ctx, imagedata);
+                                    plugin.layer.call(plugin, view, ctx, imagedata);
                                 }
                             }
                             //blit
@@ -152,7 +148,7 @@ var methods = {
                             for(var i=0;i<view.plugins.length; i++) {
                                 var plugin = view.plugins[i];
                                 if(plugin.enable) {
-                                    plugin.draw.call(view, ctx);
+                                    plugin.draw.call(plugin, view, ctx);
                                 }
                             }
                         }
@@ -707,7 +703,7 @@ var methods = {
 
                         //load info.json to master layer
                         $.ajax({
-                            url: src+"/info.json",
+                            url: src+"/info.php",
                             dataType: "json",
                             success: function(data) {
                                 layer.info = data;
@@ -846,29 +842,33 @@ var methods = {
                         }
                     }
 
-                    //pass to plugins
-                    for(var i=0;i<view.callback_mousedown.length; i++) {
-                        var callback = view.callback_mousedown[i];
-                        callback.call(view, e, x,y);
+                    for(var i=0;i<view.plugins.length; i++) {
+                        var plugin = view.plugins[i];
+                        if(plugin.enable && plugin.onmousedown) {
+                            plugin.onmousedown.call(plugin, view, e, x,y);
+                        }
                     }
 
                     return false;
                 });
 
                 //disable contextmenu 
-                $(view.canvas).contextmenu(function(e) {
-                    return false;
-                });
+                if($(view.canvas).contextmenu) {
+                    $(view.canvas).contextmenu(function(e) {
+                        return false;
+                    });
+                }
 
                 //we want to capture mouseup on whole doucument - not just canvas
                 $(document).mouseup(function(e){
                     document.body.style.cursor="auto";
                     view.mousedown = false;
 
-                    //pass to plugins
-                    for(var i=0;i<view.callback_mouseup.length; i++) {
-                        var callback = view.callback_mouseup[i];
-                        callback.call(view, e);
+                    for(var i=0;i<view.plugins.length; i++) {
+                        var plugin = view.plugins[i];
+                        if(plugin.enable && plugin.onmouseup) {
+                            plugin.onmouseup.call(plugin, view, e);
+                        }
                     }
 
                     return false;
@@ -973,9 +973,11 @@ var methods = {
                         }
                     }
 
-                    for(var i=0;i<view.callback_mousemove.length; i++) {
-                        var callback = view.callback_mousemove[i];
-                        callback.call(view, e, x,y);
+                    for(var i=0;i<view.plugins.length; i++) {
+                        var plugin = view.plugins[i];
+                        if(plugin.enable && plugin.onmousemove) {
+                            plugin.onmousemove.call(plugin, view, e, x, y);
+                        }
                     }
 
                     view.update_status(); //mouse position change doesn't cause view udpate.. so I have to call this 
@@ -1024,6 +1026,7 @@ var methods = {
         });
     },
 
+/*
     addcallback_mousedown: function(callback) {
         return this.each(function() {
             var view = $(this).data("view");
@@ -1042,6 +1045,7 @@ var methods = {
             view.callback_mousemove.push(callback);
         });
     },
+*/
 
     // set layer options
     layer: function(options) {
