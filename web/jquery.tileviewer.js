@@ -703,7 +703,7 @@ var methods = {
 
                         //load info.json to master layer
                         $.ajax({
-                            url: src+"/info.php",
+                            url: src+"/info.json",
                             dataType: "json",
                             success: function(data) {
                                 layer.info = data;
