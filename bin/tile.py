@@ -20,7 +20,8 @@ import subprocess
 import time
 
 #configuration
-tmpdir="/usr/local/tmp"
+#tmpdir="/usr/local/tmp"
+tmpdir="/tmp"
 tilesize=256
 
 def tile(source_image, tile_dir):
