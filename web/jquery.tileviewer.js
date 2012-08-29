@@ -10,7 +10,7 @@ TileViewer HTML5 client
 
 The MIT License
 
-    Copyright (c) 2011 Soichi Hayashi (https://sites.google.com/site/soichih/)
+    Copyright (c) 2012 Soichi Hayashi (https://sites.google.com/site/soichih/)
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -434,13 +434,6 @@ var methods = {
                     },
 
                     draw_select_1d: function(ctx) {
-
-        /*
-                        ctx.shadowOffsetX = 1;
-                        ctx.shadowOffsetY = 1;
-                        ctx.shadowBlur    = 2;
-                        ctx.shadowColor   = 'rgba(0,0,0,0.5)';
-        */ 
                         //draw line..
                         ctx.beginPath();
                         ctx.moveTo(view.select.x, view.select.y);
@@ -458,12 +451,6 @@ var methods = {
                     },
 
                     draw_select_2d: function(ctx) {
-        /*
-                        ctx.shadowOffsetX = 2;
-                        ctx.shadowOffsetY = 2;
-                        ctx.shadowBlur    = 2;
-                        ctx.shadowColor   = 'rgba(0,0,0,0.5)';
-        */
                         ctx.shadowOffsetX = 0;
                         ctx.shadowOffsetY = 0;
                         ctx.shadowBlur    = 0;
@@ -1023,6 +1010,9 @@ var methods = {
         return this.each(function() {
             var view = $(this).data("view");
             view.plugins.push(plugin);
+            if(plugin.init) {
+                plugin.init.call(plugin, view);
+            }
         });
     },
 
@@ -1109,9 +1099,6 @@ var methods = {
         });
     },
 */
-
-    ///////////////////////////////////////////////////////////////////////////////////
-    // use this to animate the view (or zoom)
     getpos: function () {
         //get current position
         var view = $(this).data("view");
@@ -1120,6 +1107,16 @@ var methods = {
         pos.level = Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*1000)/1000;
         return pos;
     },
+
+    //get current 2d select position
+    get2dselpos: function () {
+        var view = $(this).data("view");
+        var layer = view.layers[0];
+        var selpos1 = view.client2pixel(layer, view.select.x, view.select.y);
+        var selpos2 = view.client2pixel(layer, view.select.x+view.select.width, view.select.y+view.select.height);
+        return {x: selpos1.x, y: selpos1.y, width: selpos2.x - selpos1.x, height: selpos2.y - selpos1.y};
+    },
+
     redraw: function() {
         return this.each(function() {
             var view = $(this).data("view");
