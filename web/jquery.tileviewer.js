@@ -44,15 +44,15 @@ var methods = {
             width: 400, //canvas width - not image width
             height: 300, //canvas height - not image height
             zoom_sensitivity: 32, 
-            thumbnail: true,//display thumbnail
-            magnifier: false,//display magnifier
+            //thumbnail: false,//display thumbnail
+            //magnifier: false,//display magnifier
             debug: false,
             pixel: true,
-            magnifier_view_size: 200, //view size
-            magnifier_view_area: 32, //pixel w/h sizes to zoom
+            //magnifier_view_size: 200, //view size
+            //magnifier_view_area: 32, //pixel w/h sizes to zoom
             graber_size: 12, //size of the grabber area
-            maximum_pixelsize: 1,//set this to >1 if you want to let user to zoom image after reaching its original resolution (also consider using magnifier..)
-            thumb_depth: 2 //level depth when thumb nail should appear
+            maximum_pixelsize: 1//set this to >1 if you want to let user to zoom image after reaching its original resolution
+            //thumb_depth: 2 //level depth when thumb nail should appear
         };
 
         var layer_defaults = {
@@ -73,7 +73,6 @@ var methods = {
                         //you can add as many layers as you want.. layers[0] is master
                     ],
                     canvas: document.createElement("canvas"),
-                    status: document.createElement("p"),
                     mode: null, //current mouse left button mode (pan, sel2d, sel1d, etc..)
                     pan: {
                         //pan destination
@@ -87,23 +86,26 @@ var methods = {
                         width: null,
                         height: null
                     },
-                    magnifier_canvas: document.createElement("canvas"),
+                    //magnifier_canvas: document.createElement("canvas"),
                     //current mouse position (client pos)
                     xnow: null,
                     ynow: null,
                     mousedown: false,
                     mousedown_r: false,//right mouse button
-                    drawmsec: null, //milli seconds tool to draw a frame
                     needdraw: false, //flag used to request for frameredraw 
+                
+                    debug_lastdraw: 0,
 
                     plugins: [],
 
                     ///////////////////////////////////////////////////////////////////////////////////
                     // internal functions
                     draw: function() {
-                        var start = new Date().getTime();
                         view.needdraw = false;
-
+                        if(options.debug) {
+                            var start = new Date().getTime();
+                            
+                        }
                         var ctx = view.canvas.getContext("2d");
                         view.canvas.width = $this.width();//clear canvas
                         view.canvas.height = $this.height();//clear canvas
@@ -117,19 +119,17 @@ var methods = {
                             var imagedata = null;
                             for(var i=0;i<view.plugins.length; i++) {
                                 var plugin = view.plugins[i];
-                                if(plugin.enable) {
-                                    if(imagedata == null) {
-                                        imagedata = ctx.getImageData(0,0,view.canvas.width, view.canvas.height);
-                                    }
-                                    plugin.layer.call(plugin, view, ctx, imagedata);
+                                if(imagedata == null) {
+                                    imagedata = ctx.getImageData(0,0,view.canvas.width, view.canvas.height);
                                 }
+                                plugin.onlayer.call(plugin, view, ctx, imagedata);
                             }
                             //blit
                             if(imagedata != null) {
                                 ctx.putImageData(imagedata,0,0);
                             }
 
-                            //draw overlays
+                            //draw layer overlays 
                             for(var i=1; i<view.layers.length; i++) {
                                 var overlay_layer = view.layers[i];
                                 if(overlay_layer.enable) {
@@ -137,41 +137,40 @@ var methods = {
                                 }
                             }
 
-                            //draw views
-                            if(options.magnifier) {
-                                view.draw_magnifier(ctx);
-                            }
+                            //draw interactive elements
                             if(master_layer.info) {
                                 view.draw_mode(master_layer, ctx);
                             }
-
-                            //apply tool plugins
-                            for(var i=0;i<view.plugins.length; i++) {
-                                var plugin = view.plugins[i];
-                                if(plugin.enable) {
-                                    plugin.draw.call(plugin, view, ctx);
-                                }
-                            }
                         }
                         
-                        //calculate framerate
-                        var end = new Date().getTime();
-                        //var time = end - start;
-                        //view.framerate = Math.round(1000/time);
-                        view.drawmsec = end-start;
+                        //output debug stats
+                        if(options.debug) {
+                            var end = new Date().getTime();
+                            var time = end - start;
+                            var status = "draw:" + start + " in:"+time+" sincelast: " + (start - view.debug_lastdraw);
+                            view.debug_lastdraw = start;
+                            for(var i=0; i<view.layers.length; i++) {
+                                var layer = view.layers[i];
+                                if(layer.enable) {
+                                    status += "loading:"+layer.loader.queue.length;
+                                }
+                            }
+                            $("#debug").html(status);
+                        }
 
-                        view.update_status();
                     },
 
                     draw_mode: function(layer, ctx) {
                         switch(view.mode) {
                         case "pan":
+                            /*
                             if(options.thumbnail) {
                                 //only draw thumbnail if we are zoomed in far enough
                                 if(layer.info._maxlevel - layer.level > options.thumb_depth) {
                                     view.draw_thumb(layer, ctx);
                                 }
                             }
+                            */
                             break;
                         case "select_1d":
                             view.draw_select_1d(ctx);
@@ -182,49 +181,13 @@ var methods = {
                         }
                     },
 
-                    update_status: function() {
-
-                        if(options.debug) {
-                            if(view.layers.length > 0) {
-                                var html = "";
-
-                                var layer = view.layers[0]; //use master layer
-                                if(layer.info) {
-                                    var pixel_pos = view.client2pixel(layer, view.xnow, view.ynow);
-                                    html += "<p>draw msec: " + view.drawmsec+ 
-                                        "<br>x:" + pixel_pos.x + 
-                                        "<br>y:" + pixel_pos.y + "</p>";
-                                }
-                                //html += "level min: "+ view.level.min+"<br>level max: " + view.level.max + "<br>";
-
-                                for(var i=0; i<view.layers.length; i++) {
-                                    var layer = view.layers[i];
-                                    if(layer.info) {
-                                        html += "<p>layer: " + layer.id +
-                                            "<br>width: " + layer.info.width + 
-                                            "<br>height: " + layer.info.height + 
-                                            "<br>maxlevel: " + layer.info._maxlevel +
-                                            "<br>level:" + Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*100)/100 + 
-                                                " (tsize:"+Math.round(layer.tilesize*100)/100+")"+
-                                            "<br>images loading: " + layer.loader.loading + 
-                                            "<br>request queue: " + layer.loader.queue.length + 
-                                            "<br>tiles in dict: " + layer.loader.tile_count + 
-                                            "</p>"
-                                    }
-                                }
-                                $(view.status).html(html);
-                            }
-                        } else {
-                            $(view.status).empty();
-                        }
-                    },
-
                     draw_tiles: function(layer, ctx) {
                         //display tiles
                         var xmin = Math.max(0, Math.floor(-layer.xpos/layer.tilesize));
                         var ymin = Math.max(0, Math.floor(-layer.ypos/layer.tilesize));
                         var xmax = Math.min(layer.xtilenum, Math.ceil((view.canvas.clientWidth-layer.xpos)/layer.tilesize));
                         var ymax = Math.min(layer.ytilenum, Math.ceil((view.canvas.clientHeight-layer.ypos)/layer.tilesize));
+
                         for(var y = ymin; y < ymax; y++) {
                             for(var x  = xmin; x < xmax; x++) {
                                 view.draw_tile(layer, ctx,x,y);
@@ -232,15 +195,8 @@ var methods = {
                         }
                     },
 
+                    /*
                     draw_thumb: function(layer, ctx) {
-                        /*
-                        //set shadow
-                        ctx.shadowOffsetX = 3;
-                        ctx.shadowOffsetY = 3;
-                        ctx.shadowBlur    = 4;
-                        ctx.shadowColor   = 'rgba(0,0,0,1)';
-                        */
-
                         //draw thumbnail image
                         ctx.drawImage(layer.thumb, 0, 0, layer.thumb.width, layer.thumb.height);
 
@@ -251,6 +207,7 @@ var methods = {
                         ctx.lineWidth   = 1;
                         ctx.strokeRect(rect.x*factor, rect.y*factor, rect.width*factor, rect.height*factor);
                     },
+                    */
 
                     draw_tile: function(layer, ctx,x,y) {
                         var tileid = x + y*layer.xtilenum;
@@ -266,6 +223,7 @@ var methods = {
                             if(y == layer.ytilenum-1) {
                                 ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
                             }
+/*
                             if($.browser.mozilla) {
                                 //firefox can't draw sub-pixel image (yet).. adjust it..
                                 ctx.drawImage(img, Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize),    
@@ -273,6 +231,8 @@ var methods = {
                             } else {
                                 ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                             }
+*/
+                            ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                             img.access_timestamp = new Date().getTime();//update last access timestamp
                         }
 
@@ -317,6 +277,7 @@ var methods = {
                                 if(x == layer.xtilenum-1) sw = layer.tilesize_xlast/factor;
                                 var sh = half_tilesize;
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
+/*
                                 if($.browser.mozilla) {
                                     //firefox can't draw sub-pixel image .. adjust it..
                                     ctx.drawImage(img, sx, sy, sw, sh, 
@@ -326,6 +287,8 @@ var methods = {
                                     ctx.drawImage(img, sx, sy, sw, sh, 
                                         layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 }
+*/
+                                ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.access_timestamp = new Date().getTime();
                                 return;
                             }
@@ -412,6 +375,7 @@ var methods = {
                         }
                     },
 
+/*
                     draw_magnifier:  function(ctx) {
                         //grab magnifier image
                         var mcontext = view.magnifier_canvas.getContext("2d");
@@ -425,13 +389,8 @@ var methods = {
 
                         //display on the bottom left corner
                         ctx.drawImage(view.magnifier_canvas, 0, view.canvas.clientHeight-options.magnifier_view_size, options.magnifier_view_size, options.magnifier_view_size);
-                        /*
-                        //display where the cursor is
-                        ctx.drawImage(view.magnifier_canvas, 
-                            view.xnow-options.magnifier_view_size/2, view.ynow-options.magnifier_view_size/2, 
-                            options.magnifier_view_size, options.magnifier_view_size);
-                        */
                     },
+*/
 
                     draw_select_1d: function(ctx) {
                         //draw line..
@@ -520,10 +479,11 @@ var methods = {
                     },
 
                     change_zoom: function(delta, x, y) {
-
                         var layer = view.layers[0];
                         if(!layer.info) return;//master not loaded yet
-
+                        
+                        //prevent delta to be too large to skip level increment
+                        if(layer.tilesize+delta < layer.tilesize/2) delta = layer.tilesize/2 - layer.tilesize;
                         //don't let it shrink too much
                         if(layer.level == layer.info._maxlevel-1 && layer.tilesize+delta < layer.info.tilesize/2) return false;
                         //don't let overzoom
@@ -727,22 +687,24 @@ var methods = {
                 //setup views
                 $this.addClass("tileviewer");
                 $(view.canvas).css("background-color", "#222");
+                /*
                 $(view.canvas).css("width", "100%");
                 $(view.canvas).css("height", "100%");
+                */
 
                 $this.append(view.canvas);
-                $(view.status).addClass("status");
-                $this.append(view.status);
                 methods.setmode.call($this, {mode: "pan"});
 
                 //add master layer
                 view.addlayer("master", options.src, true);
+/*
 
                 //setup magnifier canvas
                 view.magnifier_canvas.width = options.magnifier_view_area;
                 view.magnifier_canvas.height = options.magnifier_view_area;
-/*
+*/
 
+/* - currently using 0.png
                 //load thumbnail
                 layer.thumb = new Image();
                 layer.thumb.src = options.src+"/thumb.png";
@@ -773,7 +735,6 @@ var methods = {
                 };
                 draw_thread();
 */
-
                 //redraw thread
                 var draw_thread = function() {
                     if(view.pan.xdest) {
@@ -783,7 +744,6 @@ var methods = {
                     if(view.needdraw) {
                         view.draw();
                     }
-                    //setTimeout(draw_thread, 30);
                 }
                 //read http://ejohn.org/blog/how-javascript-timers-work/
                 setInterval(draw_thread, 20);
@@ -829,17 +789,19 @@ var methods = {
                         }
                     }
 
+/*
                     for(var i=0;i<view.plugins.length; i++) {
                         var plugin = view.plugins[i];
-                        if(plugin.enable && plugin.onmousedown) {
+                        if(plugin.onmousedown) {
                             plugin.onmousedown.call(plugin, view, e, x,y);
                         }
                     }
+*/
 
                     return false;
                 });
 
-                //disable contextmenu 
+                //disable contextmenu (we need to use right mouse button)
                 if($(view.canvas).contextmenu) {
                     $(view.canvas).contextmenu(function(e) {
                         return false;
@@ -853,7 +815,7 @@ var methods = {
 
                     for(var i=0;i<view.plugins.length; i++) {
                         var plugin = view.plugins[i];
-                        if(plugin.enable && plugin.onmouseup) {
+                        if(plugin.onmouseup) {
                             plugin.onmouseup.call(plugin, view, e);
                         }
                     }
@@ -861,17 +823,20 @@ var methods = {
                     return false;
                 });
 
-                $(view.canvas).mousemove(function(e) {
+                //set on whole document so that I can track dragging everywhere
+                $(document).mousemove(function(e) {
                     var offset = $(view.canvas).offset();
                     var x = e.pageX - offset.left;
                     var y = e.pageY - offset.top;
                     view.xnow = x;
                     view.ynow = y;
 
+                    /*
                     if(options.magnifier) {
                         //need to redraw magnifier
                         view.needdraw = true;
                     }
+                    */
 
                     if(view.mousedown) {
                         //dragging
@@ -882,7 +847,6 @@ var methods = {
                                 layer.xpos = x - view.pan.xhot;
                                 layer.ypos = y - view.pan.yhot;
                             }
-                            view.draw();//TODO - should I call needdraw instead?
                             break;
                         case "select_1d":
                             switch(view.select.item) {
@@ -897,7 +861,6 @@ var methods = {
                                 view.select.height = y - view.select.hhot;
                                 break;
                             }
-                            view.draw();
                             break;
                         case "select_2d":
                             switch(view.select.item) {
@@ -926,9 +889,9 @@ var methods = {
                                 view.select.height = y - view.select.hhot;
                                 break;
                             }
-                            view.draw();
                             break;
                         }
+                        view.needdraw = true;//don't use view.draw() - firefox will freeze up if you hold cpu on mouse event handler
                     } else {
                         //just hovering
                         switch(view.mode) {
@@ -962,12 +925,10 @@ var methods = {
 
                     for(var i=0;i<view.plugins.length; i++) {
                         var plugin = view.plugins[i];
-                        if(plugin.enable && plugin.onmousemove) {
+                        if(plugin.onmousemove) {
                             plugin.onmousemove.call(plugin, view, e, x, y);
                         }
                     }
-
-                    view.update_status(); //mouse position change doesn't cause view udpate.. so I have to call this 
                     return false;
                 });
 
@@ -976,6 +937,7 @@ var methods = {
                     delta = delta*options.zoom_sensitivity;
                     var offset = $(view.canvas).offset();
                     view.change_zoom(delta, e.pageX - offset.left, e.pageY - offset.top);
+
                     view.needdraw = true;
                     return false;
                 });
@@ -1010,32 +972,11 @@ var methods = {
         return this.each(function() {
             var view = $(this).data("view");
             view.plugins.push(plugin);
-            if(plugin.init) {
-                plugin.init.call(plugin, view);
+            if(plugin.oninit) {
+                plugin.oninit.call(plugin, view);
             }
         });
     },
-
-/*
-    addcallback_mousedown: function(callback) {
-        return this.each(function() {
-            var view = $(this).data("view");
-            view.callback_mousedown.push(callback);
-        });
-    },
-    addcallback_mouseup: function(callback) {
-        return this.each(function() {
-            var view = $(this).data("view");
-            view.callback_mouseup.push(callback);
-        });
-    },
-    addcallback_mousemove: function(callback) {
-        return this.each(function() {
-            var view = $(this).data("view");
-            view.callback_mousemove.push(callback);
-        });
-    },
-*/
 
     // set layer options
     layer: function(options) {
@@ -1106,6 +1047,13 @@ var methods = {
         var pos = view.center_pixelpos(layer);
         pos.level = Math.round((layer.level + layer.info.tilesize/layer.tilesize-1)*1000)/1000;
         return pos;
+    },
+
+    client2pixel: function(x, y) {
+        var view = $(this).data("view");
+        var layer = view.layers[0];
+        if(layer.info == null) return null;//layer info not yet loaded
+        return view.client2pixel(layer, x, y);
     },
 
     //get current 2d select position
