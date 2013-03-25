@@ -74,7 +74,7 @@ def tile(source_image, tile_dir):
         print "level", level
         level_dir = tile_dir+"/level"+str(level)
         os.makedirs(level_dir)
-        cmd = "gm convert "+processing_image+" -crop "+str(tilesize)+"x"+str(tilesize)+" "+level_dir+"/%d.png"
+        cmd = "gm convert "+processing_image+" -crop "+str(tilesize)+"x"+str(tilesize)+" +adjoin "+level_dir+"/%d.png"
         print cmd
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         for line in proc.stdout.readlines():
