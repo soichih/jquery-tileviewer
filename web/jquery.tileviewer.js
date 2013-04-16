@@ -195,20 +195,6 @@ var methods = {
                         }
                     },
 
-                    /*
-                    draw_thumb: function(layer, ctx) {
-                        //draw thumbnail image
-                        ctx.drawImage(layer.thumb, 0, 0, layer.thumb.width, layer.thumb.height);
-
-                        //draw current view
-                        var rect = view.get_viewpos(layer);
-                        var factor = layer.thumb.height/layer.info.height;
-                        ctx.strokeStyle = '#f00'; 
-                        ctx.lineWidth   = 1;
-                        ctx.strokeRect(rect.x*factor, rect.y*factor, rect.width*factor, rect.height*factor);
-                    },
-                    */
-
                     draw_tile: function(layer, ctx,x,y) {
                         var tileid = x + y*layer.xtilenum;
                         var url = layer.src+"/level"+layer.level+"/"+tileid+".png";
@@ -223,16 +209,12 @@ var methods = {
                             if(y == layer.ytilenum-1) {
                                 ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
                             }
-/*
-                            if($.browser.mozilla) {
-                                //firefox can't draw sub-pixel image (yet).. adjust it..
-                                ctx.drawImage(img, Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize),    
-                                    Math.ceil(xsize),Math.ceil(ysize));
-                            } else {
-                                ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
-                            }
-*/
-                            ctx.drawImage(img, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
+
+                            //try to align at N.5 position
+                            var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
+                            var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
+
+                            ctx.drawImage(img, xpos,ypos, xsize,ysize);
                             img.access_timestamp = new Date().getTime();//update last access timestamp
                         }
 
@@ -277,17 +259,6 @@ var methods = {
                                 if(x == layer.xtilenum-1) sw = layer.tilesize_xlast/factor;
                                 var sh = half_tilesize;
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
-/*
-                                if($.browser.mozilla) {
-                                    //firefox can't draw sub-pixel image .. adjust it..
-                                    ctx.drawImage(img, sx, sy, sw, sh, 
-                                        Math.floor(layer.xpos+x*layer.tilesize), Math.floor(layer.ypos+y*layer.tilesize), 
-                                        Math.ceil(xsize),Math.ceil(ysize));
-                                } else {
-                                    ctx.drawImage(img, sx, sy, sw, sh, 
-                                        layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
-                                }
-*/
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.access_timestamp = new Date().getTime();
                                 return;
@@ -295,13 +266,6 @@ var methods = {
                             //try another level
                             down++;
                         }
-
-                        //console.log("subtile miss on layer:" + layer.src);
-                        /* let's not do anything - I needed while debugging mostly
-                        //nosubtile available.. draw empty rectangle as the last resort
-                        ctx.fillStyle = options.empty;
-                        ctx.fillRect(layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize, ysize);
-                        */
                     },
 
                     loader_request: function(layer, url, img) {
@@ -374,23 +338,6 @@ var methods = {
                             }
                         }
                     },
-
-/*
-                    draw_magnifier:  function(ctx) {
-                        //grab magnifier image
-                        var mcontext = view.magnifier_canvas.getContext("2d");
-                        var marea = ctx.getImageData(
-                            view.xnow-options.magnifier_view_area/2, 
-                            view.ynow-options.magnifier_view_area/2, 
-                            options.magnifier_view_area,
-                            options.magnifier_view_area);
-
-                        mcontext.putImageData(marea, 0,0);//draw to canvas so that I can zoom it up
-
-                        //display on the bottom left corner
-                        ctx.drawImage(view.magnifier_canvas, 0, view.canvas.clientHeight-options.magnifier_view_size, options.magnifier_view_size, options.magnifier_view_size);
-                    },
-*/
 
                     draw_select_1d: function(ctx) {
                         //draw line..
@@ -650,6 +597,7 @@ var methods = {
                         view.layers.push(layer);
 
                         //load info.json to master layer
+                        //console.log("layer "+id+" :: loading info.json from "+src);
                         $.ajax({
                             url: src+"/info.json",
                             dataType: "json",
@@ -746,7 +694,7 @@ var methods = {
                     }
                 }
                 //read http://ejohn.org/blog/how-javascript-timers-work/
-                setInterval(draw_thread, 20);
+                setInterval(draw_thread, 16);
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
@@ -809,6 +757,7 @@ var methods = {
                 }
 
                 //we want to capture mouseup on whole doucument - not just canvas
+                //element.setCapture() doesn't work on IE.. so I heard
                 $(document).mouseup(function(e){
                     document.body.style.cursor="auto";
                     view.mousedown = false;
@@ -1027,19 +976,23 @@ var methods = {
         });
     },
 
-/*
+    /* -- need to move all layers on all tv(s)?
     ///////////////////////////////////////////////////////////////////////////////////
     // use this to jump to the destination pos / zoom
     setpos: function (options) {
         return this.each(function() {
-            var layer = $(this).data("layer");
             var view = $(this).data("view");
+            var layer = view.layers[0];
             layer.xpos = options.x;
             layer.ypos = options.y;
-            layer.level = Math.round(options.level); //TODO process sub decimal value
+            if(options.level) { //optional
+                layer.level = Math.round(options.level); //TODO process sub decimal value
+            }
+            view.needdraw = true;
         });
     },
-*/
+    */
+
     getpos: function () {
         //get current position
         var view = $(this).data("view");
