@@ -143,6 +143,7 @@ var methods = {
                             }
                         }
                         
+                        /*
                         //output debug stats
                         if(options.debug) {
                             var end = new Date().getTime();
@@ -157,7 +158,7 @@ var methods = {
                             }
                             $("#debug").html(status);
                         }
-
+                        */
                     },
 
                     draw_mode: function(layer, ctx) {
@@ -215,10 +216,12 @@ var methods = {
                             var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
                             var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
 
-                            ctx.drawImage(img, xpos,ypos, xsize,ysize);
-                            img.timestamp = new Date().getTime();//update last access timestamp
-                            if(img.json) {
+
+                            if(img.json && xsize > layer.info.tilesize) {
                                 view.draw_json(layer, ctx, img.json, x, y);
+                            } else {
+                                ctx.drawImage(img, xpos,ypos, xsize,ysize);
+                                img.timestamp = new Date().getTime();//update last access timestamp
                             }
                         }
 
@@ -268,9 +271,11 @@ var methods = {
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
 
+                                /*
                                 if(img.json) {
                                     view.draw_json(layer, ctx, img.json, x, y);
                                 }
+                                */
 
                                 return;
                             }
@@ -282,15 +287,17 @@ var methods = {
 
                     draw_json: function(layer, ctx, json, x, y) {
                         var zoomfactor = layer.tilesize/layer.info.tilesize;
-                        
+
                         //for text
                         ctx.font = "12pt Arial";
-                        ctx.fillStyle = "#0f0";
                         ctx.textBaseline = 'middle';
-
-                        //for circle
-                        ctx.strokeStyle = "#0f0";
-                        ctx.lineWidth = 2;
+                        /*
+                        ctx.shadowColor = "#000";
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 0;
+                        ctx.shadowBlur = 5;
+                        */
+                         
                         for(i in json) {
                             var item = json[i];
                             var xoff = zoomfactor*item.x;
@@ -298,15 +305,41 @@ var methods = {
                             var xpos = layer.xpos+x*layer.tilesize+xoff
                             var ypos = layer.ypos+y*layer.tilesize+yoff;
                             switch(item.type) {
-                            case "circle":
-                                var radius = zoomfactor*item.radius;
+                            case "circle-pop": //circle with mouseover popup with some html content
+                                var r = zoomfactor*item.r;
+                            
+                                if(Math.abs(view.xnow - xpos+r) < r && Math.abs(view.ynow - ypos) < r) {
+                                    var metrics = ctx.measureText(item.text);
+                                    //draw black background
+                                    ctx.beginPath();
+                                    ctx.rect(xpos+r/4, ypos-10, metrics.width+r/2, 22);
+                                    ctx.fillStyle = "#000";
+                                    ctx.fill();
+
+                                    //draw text
+                                    ctx.fillStyle = "#fff";
+                                    ctx.fillText(item.text, xpos+r/2, ypos);
+
+                                    //for circle
+                                    ctx.strokeStyle = "white";
+
+                                    //document.body.style.cursor="pointer";
+                                } else {
+                                    //for circle
+                                    ctx.strokeStyle = "#0f0";
+                                }
+
                                 ctx.beginPath();
-                                ctx.arc(xpos, ypos, radius, 0, 2 * Math.PI, false);
+                                ctx.lineWidth = 2;
+                                ctx.arc(xpos-r, ypos, r, 0, 2 * Math.PI, false);
                                 ctx.stroke();
+
                                 break;
+                            /*
                             case "text":
                                 ctx.fillText(item.content, xpos, ypos);
                                 break;
+                            */
                             }
                         }
                     },
@@ -327,8 +360,7 @@ var methods = {
                                 if(this.level_loaded_for == layer.level) {
                                     //ideally, I'd like to just draw the tile that got loaded,
                                     //but since I now support layering, I need to redraw the whole thing..
-                                    //This means that tons of unnecessary image request will be made whenever
-                                    //a lot of tiles are loaded simultanously
+                                    //performance doesn't seems to be suffering too much, however..
                                     view.needdraw = true;
                                 }
                                 layer.loader.loading--;
@@ -360,12 +392,12 @@ var methods = {
                                 if(layer.info.levels != undefined && layer.info.levels[img.level_loaded_for] != undefined) {
                                     var levelinfo = layer.info.levels[img.level_loaded_for];
                                     if(levelinfo == "json") {
-                                        //load json content (TODO - do this if we have json for this level)
                                         $.ajax({
                                             url: img.request_src+".json", dataType: "json", 
                                             context: img
                                         }).done(function(data) {
                                                 this.json = data;
+                                                //this.onload();
                                         });
                                     }
                                 }
@@ -699,66 +731,22 @@ var methods = {
                 //setup views
                 $this.addClass("tileviewer");
                 $(view.canvas).css("background-color", "#222");
-                /*
-                $(view.canvas).css("width", "100%");
-                $(view.canvas).css("height", "100%");
-                */
 
                 $this.append(view.canvas);
                 methods.setmode.call($this, {mode: "pan"});
 
                 //add master layer
                 view.addlayer("master", options.src, true);
-/*
 
-                //setup magnifier canvas
-                view.magnifier_canvas.width = options.magnifier_view_area;
-                view.magnifier_canvas.height = options.magnifier_view_area;
-*/
-
-/* - currently using 0.png
-                //load thumbnail
-                layer.thumb = new Image();
-                layer.thumb.src = options.src+"/thumb.png";
-*/
-/*
-                // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
-                // requestAnim shim layer by Paul Irish
-                window.requestAnimFrame = (function(){
-                  return  window.requestAnimationFrame       || 
-                          window.webkitRequestAnimationFrame || 
-                          window.mozRequestAnimationFrame    || 
-                          window.oRequestAnimationFrame      || 
-                          window.msRequestAnimationFrame     || 
-                          function(callback, element){
-                            window.setTimeout(callback, 1000 / 60);
-                          };
-                })();
-
-                var draw_thread = function() {
-                    requestAnimFrame(draw_thread);
+                //redraw thread - read http://ejohn.org/blog/how-javascript-timers-work/
+                setInterval(function() {
                     if(view.pan.xdest) {
                         view.pan();
                     }
-
                     if(view.needdraw) {
                         view.draw();
                     }
-                };
-                draw_thread();
-*/
-                //redraw thread
-                var draw_thread = function() {
-                    if(view.pan.xdest) {
-                        view.pan();
-                    }
-
-                    if(view.needdraw) {
-                        view.draw();
-                    }
-                }
-                //read http://ejohn.org/blog/how-javascript-timers-work/
-                setInterval(draw_thread, 16);
+                }, 16);
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
@@ -800,15 +788,6 @@ var methods = {
                             break;
                         }
                     }
-
-/*
-                    for(var i=0;i<view.plugins.length; i++) {
-                        var plugin = view.plugins[i];
-                        if(plugin.onmousedown) {
-                            plugin.onmousedown.call(plugin, view, e, x,y);
-                        }
-                    }
-*/
 
                     return false;
                 });
@@ -927,6 +906,10 @@ var methods = {
                             }
                             break;
                         }
+
+                        ///////////////////////////////////////////////////////////////////////////
+                        //do interactive json (TODO - do we really have to do this every time mouse move?)
+                        view.needdraw = true;
                     }
 
                     for(var i=0;i<view.plugins.length; i++) {
@@ -965,8 +948,6 @@ var methods = {
     },
 */
 
-    ///////////////////////////////////////////////////////////////////////////////////
-    // call this if everytime you resize the container (TODO - can't it be automated?)
     addlayer: function (options) {
         return this.each(function() {
             var view = $(this).data("view");
