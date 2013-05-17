@@ -193,11 +193,12 @@ var methods = {
                                 view.draw_tile(layer, ctx,x,y);
                             }
                         }
+                        view.loader_process(layer);
                     },
 
-                    draw_tile: function(layer, ctx,x,y) {
+                    draw_tile: function(layer, ctx, x, y) {
                         var tileid = x + y*layer.xtilenum;
-                        var url = layer.src+"/level"+layer.level+"/"+tileid+".png";
+                        var url = layer.src+"/level"+layer.level+"/"+tileid;
                         var img = layer.tiles[url];
 
                         var dodraw = function() {
@@ -215,24 +216,29 @@ var methods = {
                             var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
 
                             ctx.drawImage(img, xpos,ypos, xsize,ysize);
-                            img.access_timestamp = new Date().getTime();//update last access timestamp
+                            img.timestamp = new Date().getTime();//update last access timestamp
+                            if(img.json) {
+                                view.draw_json(layer, ctx, img.json, x, y);
+                            }
                         }
 
                         if(img == null) {
-                            view.loader_request(layer, url);
+                            //don't load overlay with sub-0 layer level
+                            if(layer.level >= 0) {
+                                view.loader_request(layer, url);
+                            }
                         } else {
                             if(img.loaded) {
                                 //good.. we have the image.. dodraw
                                 dodraw(); 
                                 return;
                             } else if(!img.loading) {
-                                //not loaded yet ... re-request using the same image
+                                //not loaded yet ... re-request using the same img to raise queue position
                                 view.loader_request(layer, url, img);
                             }
                         }
-                        view.loader_process(layer);
 
-                        //meanwhile .... draw subtile instead
+                        //meanwhile .... draw sub-tile
                         var xsize = layer.tilesize;
                         var ysize = layer.tilesize;
                         if(x == layer.xtilenum-1) {
@@ -248,7 +254,7 @@ var methods = {
                             factor <<=1;
                             var xtilenum_up = Math.ceil(layer.info.width/Math.pow(2,layer.level+down)/layer.info.tilesize);
                             var subtileid = Math.floor(x/factor) + Math.floor(y/factor)*xtilenum_up;
-                            var url = layer.src+"/level"+(layer.level+down)+"/"+subtileid+".png";
+                            var url = layer.src+"/level"+(layer.level+down)+"/"+subtileid;
                             var img = layer.tiles[url];
                             if(img && img.loaded) {
                                 //crop the source section
@@ -260,23 +266,61 @@ var methods = {
                                 var sh = half_tilesize;
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
-                                img.access_timestamp = new Date().getTime();
+                                img.timestamp = new Date().getTime();//update last access timestamp
+
+                                if(img.json) {
+                                    view.draw_json(layer, ctx, img.json, x, y);
+                                }
+
                                 return;
                             }
                             //try another level
                             down++;
                         }
+
+                    },
+
+                    draw_json: function(layer, ctx, json, x, y) {
+                        var zoomfactor = layer.tilesize/layer.info.tilesize;
+                        
+                        //for text
+                        ctx.font = "12pt Arial";
+                        ctx.fillStyle = "#0f0";
+                        ctx.textBaseline = 'middle';
+
+                        //for circle
+                        ctx.strokeStyle = "#0f0";
+                        ctx.lineWidth = 2;
+                        for(i in json) {
+                            var item = json[i];
+                            var xoff = zoomfactor*item.x;
+                            var yoff = zoomfactor*item.y;
+                            var xpos = layer.xpos+x*layer.tilesize+xoff
+                            var ypos = layer.ypos+y*layer.tilesize+yoff;
+                            switch(item.type) {
+                            case "circle":
+                                var radius = zoomfactor*item.radius;
+                                ctx.beginPath();
+                                ctx.arc(xpos, ypos, radius, 0, 2 * Math.PI, false);
+                                ctx.stroke();
+                                break;
+                            case "text":
+                                ctx.fillText(item.content, xpos, ypos);
+                                break;
+                            }
+                        }
                     },
 
                     loader_request: function(layer, url, img) {
                         if(img == undefined) {
-                            //new image -- create
+                            //brand new image.. queue as non-loading image
                             var img = new Image();
                             img.loaded = false;
                             img.loading = false;
                             img.level_loaded_for = layer.level;
                             img.request_src = url;
                             img.timestamp = new Date().getTime();
+                            img.json = null;
                             img.onload = function() {
                                 this.loaded = true;
                                 this.loading = false;
@@ -289,11 +333,9 @@ var methods = {
                                 }
                                 layer.loader.loading--;
                                 view.loader_process(layer);
-                                //console.log(img.src + " loaded");
                             };
                             layer.tiles[url] = img; //register in dictionary
                             layer.loader.tile_count++;
-                            //console.log("requesting " + url + " on " + layer.master);
                         }
 
                         //remove if already requested (so that I can add it back at the top)
@@ -303,16 +345,33 @@ var methods = {
                                 layer.loader.queue = layer.loader.queue.splice(id, 1);
                                 break;
                             }
-                        } 
+                        }
                         layer.loader.queue.push(img);
                         return img;
                     },
+
                     loader_process: function(layer) {
                         //if we can load more image, load it
                         while(layer.loader.queue.length > 0 && layer.loader.loading < layer.loader.max_loading) {
                             var img = layer.loader.queue.pop();
                             if(img.loaded == false && img.loading == false) {
-                                img.src = img.request_src;
+                               
+                                //load optional json if layer info says it has json for this level
+                                if(layer.info.levels != undefined && layer.info.levels[img.level_loaded_for] != undefined) {
+                                    var levelinfo = layer.info.levels[img.level_loaded_for];
+                                    if(levelinfo == "json") {
+                                        //load json content (TODO - do this if we have json for this level)
+                                        $.ajax({
+                                            url: img.request_src+".json", dataType: "json", 
+                                            context: img
+                                        }).done(function(data) {
+                                                this.json = data;
+                                        });
+                                    }
+                                }
+                                                                
+                                //do load the image
+                                img.src = img.request_src+".png";
                                 layer.loader.loading++;
                                 img.loading = true;
                             }
@@ -586,8 +645,8 @@ var methods = {
                             //tile loader
                             loader: {
                                 loading: 0, //actual number of images that are currently loaded
-                                max_loading: 6, //max number of image that can be loaded simultaneously
-                                max_queue: 20, //max number of images that can be queued to be loaded
+                                max_loading: 3, //max number of image that can be loaded simultaneously
+                                max_queue: 50, //max number of images that can be queued to be loaded
                                 queue: [], //FIFO queue for requested images
                                 tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
                                 max_tiles: 200 //max number of images that can be stored in tiles dictionary
@@ -596,8 +655,6 @@ var methods = {
                         };
                         view.layers.push(layer);
 
-                        //load info.json to master layer
-                        //console.log("layer "+id+" :: loading info.json from "+src);
                         $.ajax({
                             url: src+"/info.json",
                             dataType: "json",
@@ -615,12 +672,19 @@ var methods = {
                                 layer.tilesize = layer.info.tilesize/2;
 
                                 //center image
-                                var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
-                                layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
-                                layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
+                                if(layer.id == "master") {
+                                    var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
+                                    layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
+                                    layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
+                                } else {
+                                    //use master layer position for overlay
+                                    var master = view.layers[0];
+                                    layer.xpos = master.xpos;
+                                    layer.ypos = master.ypos;
+                                }
 
                                 //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
-                                var thumb_url = src+"/level"+layer.info._maxlevel+"/0.png";
+                                var thumb_url = src+"/level"+layer.info._maxlevel+"/0";
                                 layer.thumb = view.loader_request(layer, thumb_url);
                                 view.loader_process(layer);
 
@@ -780,13 +844,6 @@ var methods = {
                     view.xnow = x;
                     view.ynow = y;
 
-                    /*
-                    if(options.magnifier) {
-                        //need to redraw magnifier
-                        view.needdraw = true;
-                    }
-                    */
-
                     if(view.mousedown) {
                         //dragging
                         switch(view.mode) {
@@ -936,6 +993,7 @@ var methods = {
                 var layer = view.layers[i];
                 if(layer.id == options.id) {
                     view.layers[i] = $.extend(layer, options);
+                    //console.dir(view.layers[i]);
                     view.needdraw = true;
                     break;
                 }
