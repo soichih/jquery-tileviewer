@@ -86,6 +86,9 @@ var methods = {
                         width: null,
                         height: null
                     },
+
+                    hover: null,//item user is hovering on
+                    
                     //magnifier_canvas: document.createElement("canvas"),
                     //current mouse position (client pos)
                     xnow: null,
@@ -142,23 +145,6 @@ var methods = {
                                 view.draw_mode(master_layer, ctx);
                             }
                         }
-                        
-                        /*
-                        //output debug stats
-                        if(options.debug) {
-                            var end = new Date().getTime();
-                            var time = end - start;
-                            var status = "draw:" + start + " in:"+time+" sincelast: " + (start - view.debug_lastdraw);
-                            view.debug_lastdraw = start;
-                            for(var i=0; i<view.layers.length; i++) {
-                                var layer = view.layers[i];
-                                if(layer.enable) {
-                                    status += "loading:"+layer.loader.queue.length;
-                                }
-                            }
-                            $("#debug").html(status);
-                        }
-                        */
                     },
 
                     draw_mode: function(layer, ctx) {
@@ -212,14 +198,13 @@ var methods = {
                                 ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
                             }
 
-                            //try to align at N.5 position
-                            var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
-                            var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
-
-
                             if(img.json && xsize > layer.info.tilesize) {
                                 view.draw_json(layer, ctx, img.json, x, y);
                             } else {
+                                //try to align at N.5 position
+                                var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
+                                var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
+
                                 ctx.drawImage(img, xpos,ypos, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
                             }
@@ -288,9 +273,12 @@ var methods = {
                     draw_json: function(layer, ctx, json, x, y) {
                         var zoomfactor = layer.tilesize/layer.info.tilesize;
 
+                        /*
                         //for text
                         ctx.font = "12pt Arial";
                         ctx.textBaseline = 'middle';
+                        */
+
                         /*
                         ctx.shadowColor = "#000";
                         ctx.shadowOffsetX = 0;
@@ -298,16 +286,18 @@ var methods = {
                         ctx.shadowBlur = 5;
                         */
                          
+                        //for circle
+                        ctx.strokeStyle = "#0f0";
                         for(i in json) {
                             var item = json[i];
                             var xoff = zoomfactor*item.x;
                             var yoff = zoomfactor*item.y;
-                            var xpos = layer.xpos+x*layer.tilesize+xoff
-                            var ypos = layer.ypos+y*layer.tilesize+yoff;
+                            var xpos = Math.round(layer.xpos+x*layer.tilesize+xoff);
+                            var ypos = Math.round(layer.ypos+y*layer.tilesize+yoff);
                             switch(item.type) {
                             case "circle-pop": //circle with mouseover popup with some html content
                                 var r = zoomfactor*item.r;
-                            
+/*
                                 if(Math.abs(view.xnow - xpos+r) < r && Math.abs(view.ynow - ypos) < r) {
                                     var metrics = ctx.measureText(item.text);
                                     //draw black background
@@ -316,30 +306,24 @@ var methods = {
                                     ctx.fillStyle = "#000";
                                     ctx.fill();
 
-                                    //draw text
-                                    ctx.fillStyle = "#fff";
-                                    ctx.fillText(item.text, xpos+r/2, ypos);
-
                                     //for circle
                                     ctx.strokeStyle = "white";
 
                                     //document.body.style.cursor="pointer";
+                                    item.view_x = xpos;
+                                    item.view_y = ypos;
+                                    layer.item_hovered = item;
                                 } else {
                                     //for circle
                                     ctx.strokeStyle = "#0f0";
                                 }
+*/
 
                                 ctx.beginPath();
                                 ctx.lineWidth = 2;
                                 ctx.arc(xpos-r, ypos, r, 0, 2 * Math.PI, false);
                                 ctx.stroke();
-
                                 break;
-                            /*
-                            case "text":
-                                ctx.fillText(item.content, xpos, ypos);
-                                break;
-                            */
                             }
                         }
                     },
@@ -613,6 +597,61 @@ var methods = {
                         return false;
                     },
 
+                    hittest_pan: function(x,y) {
+
+                        if(x < 0 || x > view.canvas.clientWidth ||
+                           y < 0 || y > view.canvas.clientHeight) return null;
+
+                        //on all layers (skip master.. since master doesn't have json)
+                        for(var i=1; i<view.layers.length; i++) {
+                            var layer = view.layers[i];
+                            var lx = x - layer.xpos;
+                            var ly = y - layer.ypos;
+
+                            //find tile that user is on currently and loaded
+                            var tile_x = Math.floor(lx/layer.tilesize);
+                            var tile_y = Math.floor(ly/layer.tilesize);
+                            if(tile_x < 0 || tile_x >= layer.xtilenum) return null;
+                            if(tile_y < 0 || tile_y >= layer.ytilenum) return null;
+                            var tileid = tile_x + tile_y*layer.xtilenum;
+                            var url = layer.src+"/level"+layer.level+"/"+tileid;
+                            var img = layer.tiles[url];
+                            if(img != undefined && img.json != undefined) {
+                                var xsize = layer.tilesize;
+                                var ysize = layer.tilesize;
+                                if(x == layer.xtilenum-1) {
+                                    xsize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_xlast;
+                                }
+                                if(y == layer.ytilenum-1) {
+                                    ysize = (layer.tilesize/layer.info.tilesize)*layer.tilesize_ylast;
+                                }
+                                //if img.json is present and currently disabled
+                                if(xsize > layer.info.tilesize) {
+                                    var zoomfactor = layer.tilesize/layer.info.tilesize;
+                                    //for all json objects
+                                    for(i in img.json) {
+                                        var item = img.json[i];
+                                        var xoff = zoomfactor*item.x;
+                                        var yoff = zoomfactor*item.y;
+                                        var xpos = Math.round(layer.xpos+tile_x*layer.tilesize+xoff);
+                                        var ypos = Math.round(layer.ypos+tile_y*layer.tilesize+yoff);
+                                        switch(item.type) {
+                                        case "circle-pop": //circle with mouseover popup with some html content
+                                            var r = zoomfactor*item.r;
+                                            if(Math.abs(view.xnow - xpos+r) < r && Math.abs(view.ynow - ypos) < r) {
+                                                item.viewx = xpos;
+                                                item.viewy = ypos;
+                                                return item;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return null;
+                    },
+
                     hittest_select_1d: function(x,y) {
                         if(view.inside(x,y, 
                             view.select.x-options.graber_size/2, 
@@ -652,12 +691,12 @@ var methods = {
                          return null;
                     },
 
-                    addlayer: function(id, src, enable) {
+                    addlayer: function(options) {
                         var layer = {
                             //json.info will be loaded here (static information about the image)
                             info: null, 
-                            src: src,
-                            id: id,
+                            src: null,
+                            id: null,
                             enable: false,
 
                             //current view offset - not absolute pixel offset
@@ -673,7 +712,7 @@ var methods = {
                             tilesize: null,
 
                             thumb: null, //thumbnail image
-
+                        
                             //tile loader
                             loader: {
                                 loading: 0, //actual number of images that are currently loaded
@@ -685,14 +724,15 @@ var methods = {
                             },
                             tiles: []//tiles dictionary 
                         };
+                        layer = $.extend(layer, options);
+                        //console.dir(layer);
                         view.layers.push(layer);
 
                         $.ajax({
-                            url: src+"/info.json",
+                            url: layer.src+"/info.json",
                             dataType: "json",
                             success: function(data) {
                                 layer.info = data;
-                                layer.enable = enable;
 
                                 //calculate metadata
                                 var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
@@ -716,7 +756,7 @@ var methods = {
                                 }
 
                                 //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
-                                var thumb_url = src+"/level"+layer.info._maxlevel+"/0";
+                                var thumb_url = layer.src+"/level"+layer.info._maxlevel+"/0";
                                 layer.thumb = view.loader_request(layer, thumb_url);
                                 view.loader_process(layer);
 
@@ -736,7 +776,7 @@ var methods = {
                 methods.setmode.call($this, {mode: "pan"});
 
                 //add master layer
-                view.addlayer("master", options.src, true);
+                view.addlayer({id: "master", src: options.src, enable: true});
 
                 //redraw thread - read http://ejohn.org/blog/how-javascript-timers-work/
                 setInterval(function() {
@@ -881,6 +921,12 @@ var methods = {
                         //just hovering
                         switch(view.mode) {
                         case "pan":
+                            var prev = view.hover;
+                            view.hover = view.hittest_pan(x,y);
+                            var options = $this.data("options");
+                            if(prev != view.hover && options.onitemhover) {
+                                options.onitemhover(view.hover);
+                            }
                             break;
                         case "select_1d":
                             view.select.item = view.hittest_select_1d(x,y);
@@ -891,6 +937,13 @@ var methods = {
                         }
 
                         switch(view.mode) {
+                        case "pan":
+                            if(view.hover) {
+                                document.body.style.cursor="help";
+                            } else {
+                                document.body.style.cursor="auto";
+                            }
+                            break;
                         case "select_1d":
                         case "select_2d":
                             switch(view.select.item) {
@@ -909,7 +962,7 @@ var methods = {
 
                         ///////////////////////////////////////////////////////////////////////////
                         //do interactive json (TODO - do we really have to do this every time mouse move?)
-                        view.needdraw = true;
+                        //view.needdraw = true;
                     }
 
                     for(var i=0;i<view.plugins.length; i++) {
@@ -951,7 +1004,7 @@ var methods = {
     addlayer: function (options) {
         return this.each(function() {
             var view = $(this).data("view");
-            view.addlayer(options.id, options.src, options.enable);
+            view.addlayer(options);
         });
     },
 
