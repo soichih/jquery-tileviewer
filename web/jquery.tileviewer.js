@@ -320,7 +320,7 @@ var methods = {
 */
 
                                 ctx.beginPath();
-                                ctx.lineWidth = 2;
+                                ctx.lineWidth = 1;
                                 ctx.arc(xpos-r, ypos, r, 0, 2 * Math.PI, false);
                                 ctx.stroke();
                                 break;
