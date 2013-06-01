@@ -605,6 +605,8 @@ var methods = {
                         //on all layers (skip master.. since master doesn't have json)
                         for(var i=1; i<view.layers.length; i++) {
                             var layer = view.layers[i];
+                            if(!layer.enable) continue;
+
                             var lx = x - layer.xpos;
                             var ly = y - layer.ypos;
 
