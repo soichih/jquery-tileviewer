@@ -255,13 +255,6 @@ var methods = {
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
-
-                                /*
-                                if(img.json) {
-                                    view.draw_json(layer, ctx, img.json, x, y);
-                                }
-                                */
-
                                 return;
                             }
                             //try another level
@@ -727,44 +720,51 @@ var methods = {
                             tiles: []//tiles dictionary 
                         };
                         layer = $.extend(layer, options);
-                        //console.dir(layer);
                         view.layers.push(layer);
 
+                        process_layer_info = function(data) {
+                            if(layer.id != "master") {
+                                var master = view.layers[0];
+                                if(master.info == null) {          
+                                    setTimeout(function() {process_layer_info(data);}, 500);
+                                    return;
+                                }
+                            }
+                            layer.info = data;
+
+                            //calculate metadata
+                            var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
+                            layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
+
+                            //set initial level/size to fit the entire view
+                            var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
+                            layer.level = layer.info._maxlevel - Math.floor(min) - 1;
+                            layer.tilesize = layer.info.tilesize/2;
+
+                            //center image
+                            if(layer.id == "master") {
+                                var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
+                                layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
+                                layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
+                            } else {
+                                //use master layer position for overlay
+                                var master = view.layers[0];
+                                layer.xpos = master.xpos;
+                                layer.ypos = master.ypos;
+                            }
+
+                            //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
+                            var thumb_url = layer.src+"/level"+layer.info._maxlevel+"/0";
+                            layer.thumb = view.loader_request(layer, thumb_url);
+                            view.loader_process(layer);
+
+                            view.recalc_viewparams(layer);
+                            view.needdraw = true;
+                        };
                         $.ajax({
                             url: layer.src+"/info.json",
                             dataType: "json",
-                            success: function(data) {
-                                layer.info = data;
-
-                                //calculate metadata
-                                var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
-                                layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
-
-                                //set initial level/size to fit the entire view
-                                var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
-                                layer.level = layer.info._maxlevel - Math.floor(min) - 1;
-                                layer.tilesize = layer.info.tilesize/2;
-
-                                //center image
-                                if(layer.id == "master") {
-                                    var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
-                                    layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
-                                    layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
-                                } else {
-                                    //use master layer position for overlay
-                                    var master = view.layers[0];
-                                    layer.xpos = master.xpos;
-                                    layer.ypos = master.ypos;
-                                }
-
-                                //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
-                                var thumb_url = layer.src+"/level"+layer.info._maxlevel+"/0";
-                                layer.thumb = view.loader_request(layer, thumb_url);
-                                view.loader_process(layer);
-
-                                view.recalc_viewparams(layer);
-                                view.needdraw = true;
-                            }
+                            success: process_layer_info
                         });
                     }
                 };//view definition
