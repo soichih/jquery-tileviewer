@@ -50,7 +50,7 @@ var methods = {
             pixel: true,
             //magnifier_view_size: 200, //view size
             //magnifier_view_area: 32, //pixel w/h sizes to zoom
-            graber_size: 12, //size of the grabber area
+            graber_size: 15, //size of the grabber area
             maximum_pixelsize: 1//set this to >1 if you want to let user to zoom image after reaching its original resolution
             //thumb_depth: 2 //level depth when thumb nail should appear
         };
@@ -149,16 +149,6 @@ var methods = {
 
                     draw_mode: function(layer, ctx) {
                         switch(view.mode) {
-                        case "pan":
-                            /*
-                            if(options.thumbnail) {
-                                //only draw thumbnail if we are zoomed in far enough
-                                if(layer.info._maxlevel - layer.level > options.thumb_depth) {
-                                    view.draw_thumb(layer, ctx);
-                                }
-                            }
-                            */
-                            break;
                         case "select_1d":
                             view.draw_select_1d(ctx);
                             break;
@@ -586,6 +576,15 @@ var methods = {
                     },
 
                     inside: function(xt,yt,x,y,w,h) {
+                        //handle negative w/h
+                        if(w < 0) {
+                            w = -w;
+                            x = x - w;
+                        }
+                        if(h < 0) {
+                            h = -h;
+                            y = y - h;
+                        }
                         if(xt > x && xt < x + w && yt > y && yt < y + h) return true;
                         return false;
                     },
@@ -656,7 +655,18 @@ var methods = {
                             view.select.x-options.graber_size/2+view.select.width, 
                             view.select.y-options.graber_size/2+view.select.height,
                             options.graber_size, options.graber_size)) return "bottomright";
-                         return null;
+                        
+                        //online test
+                        if(view.inside(x,y, view.select.x, view.select.y, view.select.width, view.select.height)) {
+                            var x1 = view.select.x;
+                            var y1 = view.select.y;
+                            var x2 = view.select.x + view.select.width;
+                            var y2 = view.select.y + view.select.height;
+                            var lhs = (x-x1)*(y2-y1);
+                            var rhs = (x2-x1)*(y-y1);
+                            if(Math.abs(lhs - rhs) < 2000) return "inside";
+                        }
+                        return null;
                     },
 
                     hittest_select_2d: function(x,y) {
@@ -802,6 +812,7 @@ var methods = {
 
                         var layer = view.layers[0];
 
+                        /*
                         //mode specific extra info
                         switch(view.mode) {
                         case "pan":
@@ -816,6 +827,23 @@ var methods = {
                         case "select_2d":
                             view.select.item = view.hittest_select_2d(x,y);
                         }
+                        */
+
+                        switch(view.mode) {
+                        case "select_1d":
+                            view.select.item = view.hittest_select_1d(x,y);
+                            break;
+                        case "select_2d":
+                            view.select.item = view.hittest_select_2d(x,y);
+                            break;
+                        }
+                        if(view.select.item == null) {
+                            view.pan.xdest = null;//cancel pan
+                            view.pan.xhot = x - layer.xpos;
+                            view.pan.yhot = y - layer.ypos;
+                            document.body.style.cursor="move";
+                        }
+                        
                         switch(view.mode) {
                         case "select_1d":
                         case "select_2d":
@@ -867,56 +895,62 @@ var methods = {
 
                     if(view.mousedown) {
                         //dragging
-                        switch(view.mode) {
-                        case "pan":
+                        if(view.select.item == null) {
+                            //view panning
                             for(var i=0; i<view.layers.length; i++) {
                                 var layer = view.layers[i];
                                 layer.xpos = x - view.pan.xhot;
                                 layer.ypos = y - view.pan.yhot;
                             }
-                            break;
-                        case "select_1d":
-                            switch(view.select.item) {
-                            case "topleft":
-                                view.select.x = x - view.select.xhot;
-                                view.select.y = y - view.select.yhot;
-                                view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                        } else {
+                            switch(view.mode) {
+                            case "select_1d":
+                                switch(view.select.item) {
+                                case "inside":
+                                    view.select.x = x - view.select.xhot;
+                                    view.select.y = y - view.select.yhot;
+                                    break;
+                                case "topleft":
+                                    view.select.x = x - view.select.xhot;
+                                    view.select.y = y - view.select.yhot;
+                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
+                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                    break;
+                                case "bottomright":
+                                    view.select.width = x - view.select.whot;
+                                    view.select.height = y - view.select.hhot;
+                                    break;
+                                }
                                 break;
-                            case "bottomright":
-                                view.select.width = x - view.select.whot;
-                                view.select.height = y - view.select.hhot;
+                            case "select_2d":
+                                switch(view.select.item) {
+                                case "inside":
+                                    view.select.x = x - view.select.xhot;
+                                    view.select.y = y - view.select.yhot;
+                                    break;
+                                case "topleft":
+                                    view.select.x = x - view.select.xhot;
+                                    view.select.y = y - view.select.yhot;
+                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
+                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                    break;
+                                case "topright":
+                                    view.select.y = y - view.select.yhot;
+                                    view.select.width = x - view.select.whot;
+                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                    break;
+                                case "bottomleft":
+                                    view.select.x = x - view.select.xhot;
+                                    view.select.height = y - view.select.hhot;
+                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
+                                    break;
+                                case "bottomright":
+                                    view.select.width = x - view.select.whot;
+                                    view.select.height = y - view.select.hhot;
+                                    break;
+                                }
                                 break;
                             }
-                            break;
-                        case "select_2d":
-                            switch(view.select.item) {
-                            case "inside":
-                                view.select.x = x - view.select.xhot;
-                                view.select.y = y - view.select.yhot;
-                                break;
-                            case "topleft":
-                                view.select.x = x - view.select.xhot;
-                                view.select.y = y - view.select.yhot;
-                                view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
-                                break;
-                            case "topright":
-                                view.select.y = y - view.select.yhot;
-                                view.select.width = x - view.select.whot;
-                                view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
-                                break;
-                            case "bottomleft":
-                                view.select.x = x - view.select.xhot;
-                                view.select.height = y - view.select.hhot;
-                                view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                break;
-                            case "bottomright":
-                                view.select.width = x - view.select.whot;
-                                view.select.height = y - view.select.hhot;
-                                break;
-                            }
-                            break;
                         }
                         view.needdraw = true;//don't use view.draw() - firefox will freeze up if you hold cpu on mouse event handler
                     } else {
@@ -938,6 +972,7 @@ var methods = {
                             break;
                         }
 
+                        //set to right cursor
                         switch(view.mode) {
                         case "pan":
                             if(view.hover) {
