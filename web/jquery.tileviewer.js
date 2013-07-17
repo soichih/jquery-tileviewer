@@ -402,7 +402,12 @@ var methods = {
                         ctx.beginPath();
                         ctx.moveTo(view.select.x, view.select.y);
                         ctx.lineTo(view.select.x + view.select.width, view.select.y + view.select.height);
-                        ctx.strokeStyle = "#0c0";
+                        if(view.select.width == 0 || view.select.height == 0) {
+                            //snapped
+                            ctx.strokeStyle = "#0cc";
+                        } else {
+                            ctx.strokeStyle = "#0c0";
+                        }
                         ctx.lineWidth = 3;
                         ctx.stroke();
 
@@ -657,13 +662,20 @@ var methods = {
                             options.graber_size, options.graber_size)) return "bottomright";
                         
                         //online test
-                        if(view.inside(x,y, view.select.x, view.select.y, view.select.width, view.select.height)) {
-                            var x1 = view.select.x;
-                            var y1 = view.select.y;
-                            var x2 = view.select.x + view.select.width;
-                            var y2 = view.select.y + view.select.height;
-                            var lhs = (x-x1)*(y2-y1);
-                            var rhs = (x2-x1)*(y-y1);
+                        var grabber_d4 = options.graber_size;
+                        if(view.select.width == 0 || view.select.height == 0) {
+                            //verticaly or horizontaly alinged
+                            if(view.inside(x-grabber_d4/2,y-grabber_d4/2, 
+                                Math.min(view.select.x, view.select.x + view.select.width)-grabber_d4, 
+                                Math.min(view.select.y, view.select.y + view.select.height)-grabber_d4, 
+                                Math.abs(view.select.width)+grabber_d4, 
+                                Math.abs(view.select.height)+grabber_d4)) {
+                                return "inside";
+                            }
+                        } else if(view.inside(x,y, view.select.x, view.select.y, view.select.width, view.select.height)) {
+                            //do line / point distance test using slope difference
+                            var lhs = (x-view.select.x)*(view.select.y + view.select.height-view.select.y);
+                            var rhs = (view.select.x + view.select.width-view.select.x)*(y-view.select.y);
                             if(Math.abs(lhs - rhs) < 2000) return "inside";
                         }
                         return null;
@@ -915,10 +927,22 @@ var methods = {
                                     view.select.y = y - view.select.yhot;
                                     view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
                                     view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                    //snap
+                                    if(Math.abs(view.select.width) < 20) {
+                                        view.select.x = x + view.select.width - view.select.xhot;
+                                        view.select.width = 0;
+                                    }
+                                    if(Math.abs(view.select.height) < 20) {
+                                        view.select.y = y + view.select.height - view.select.yhot;
+                                        view.select.height = 0;
+                                    }
                                     break;
                                 case "bottomright":
                                     view.select.width = x - view.select.whot;
                                     view.select.height = y - view.select.hhot;
+                                    //snap
+                                    if(Math.abs(view.select.width) < 20) view.select.width = 0;
+                                    if(Math.abs(view.select.height) < 20) view.select.height = 0;
                                     break;
                                 }
                                 break;
