@@ -628,8 +628,8 @@ var methods = {
                                 if(xsize > layer.info.tilesize) {
                                     var zoomfactor = layer.tilesize/layer.info.tilesize;
                                     //for all json objects
-                                    for(i in img.json) {
-                                        var item = img.json[i];
+                                    for(j in img.json) {
+                                        var item = img.json[j];
                                         var xoff = zoomfactor*item.x;
                                         var yoff = zoomfactor*item.y;
                                         var xpos = Math.round(layer.xpos+tile_x*layer.tilesize+xoff);
