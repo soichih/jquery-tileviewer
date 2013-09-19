@@ -600,9 +600,7 @@ var methods = {
                            y < 0 || y > view.canvas.clientHeight) return null;
 
                         //on all layers (skip master.. since master doesn't have json)
-                        console.log(view.layers.length);
                         for(var i=1; i<view.layers.length; i++) {
-                            console.log(i);
                             var layer = view.layers[i];
                             if(!layer.enable) continue;
 
