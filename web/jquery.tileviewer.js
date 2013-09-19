@@ -55,9 +55,6 @@ var methods = {
             //thumb_depth: 2 //level depth when thumb nail should appear
         };
 
-        var layer_defaults = {
-        };
-        
         return this.each(function() {
             var $this = $(this);
             options = $.extend(defaults, options);//override defaults with options
