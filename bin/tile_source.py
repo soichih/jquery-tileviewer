@@ -32,30 +32,36 @@ for tile_id in range(cols*rows):
 img = Image.new("RGBA", (width, height))
 draw = ImageDraw.Draw(img)
 f = file(source_list, "r")
+col_list = []
 for line in f.readlines():
-    #skip comment line
+    #build our column list
     if line[0] == "#":
+        vals = line.strip().split()
+        col_list.append(vals[2])
         continue
-
+    
+    #can't do anything if positions aren't present
+    if not "X_IMAGE" in col_list or not "Y_IMAGE" in col_list:
+        print " [!] Source positions not defined!  Exiting"
+        exit()
+    
     tokens = line.strip().split()
-    info = {
-        "object": tokens[0],
-        "flux_auto": float(tokens[1]),
-        "fluxerr_auto": float(tokens[2]),
-        "mag_auto": float(tokens[3]),
-        "magerr_auto": float(tokens[4]),
-        "fwhm_image": float(tokens[7])
-    }
-    flux_auto = tokens[1]
-    x = float(tokens[5])/reduction_factor
-    y = float(tokens[6])/reduction_factor
+    info = {}
+    for col in col_list:
+        info[col] = tokens[col_list.index(col)]
+    
+    x = float(info["X_IMAGE"])/reduction_factor
+    y = float(info["Y_IMAGE"])/reduction_factor
 
-    #limit size of r
-    r = int(float(tokens[7])/reduction_factor);
-    if r < 3:
-        r = 3
-    if r > 20:
-        r = 20
+    #if fwhm is present use it, otherwise set default
+    if "FWHM" in info:
+        r = int(float(info["FWHM"])/reduction_factor);
+        if r < 3:
+            r = 3
+        if r > 20:
+            r = 20
+    else:
+        r = 5
 
     #reverse x/y
     x = width - x

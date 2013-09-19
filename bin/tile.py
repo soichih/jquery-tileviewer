@@ -21,7 +21,7 @@ import time
 
 #configuration
 #tmpdir="/usr/local/tmp"
-tmpdir="/tmp"
+tmpdir="/dev/shm"
 tilesize=256
 
 def tile(source_image, tile_dir):
