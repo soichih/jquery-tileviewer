@@ -55,6 +55,9 @@ var methods = {
             //thumb_depth: 2 //level depth when thumb nail should appear
         };
 
+        var layer_defaults = {
+        };
+        
         return this.each(function() {
             var $this = $(this);
             options = $.extend(defaults, options);//override defaults with options
@@ -277,7 +280,10 @@ var methods = {
                             switch(item.type) {
                             case "circle-pop": //circle with mouseover popup with some html content
                                 var r = zoomfactor*item.r;
-/*
+                                if(item.color){
+                                    ctx.strokeStyle = item.color;
+                                }
+/*                  
                                 if(Math.abs(view.xnow - xpos+r) < r && Math.abs(view.ynow - ypos) < r) {
                                     var metrics = ctx.measureText(item.text);
                                     //draw black background
@@ -741,15 +747,16 @@ var methods = {
                         layer = $.extend(layer, options);
                         view.layers.push(layer);
 
-                        process_layer_info = function(data) {
+                        process_layer_info = function(data, layer) {
+		            layer.info = data;
                             if(layer.id != "master") {
                                 var master = view.layers[0];
                                 if(master.info == null) {          
-                                    setTimeout(function() {process_layer_info(data);}, 500);
+                                    setTimeout(function() {process_layer_info(data, layer);}, 500);
                                     return;
                                 }
                             }
-                            layer.info = data;
+                            //layer.info = data;
 
                             //calculate metadata
                             var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
@@ -783,7 +790,9 @@ var methods = {
                         $.ajax({
                             url: layer.src+"/info.json",
                             dataType: "json",
-                            success: process_layer_info
+                            success: function(data) {
+				process_layer_info(data, layer);
+			    }
                         });
                     }
                 };//view definition
