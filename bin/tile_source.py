@@ -2,6 +2,7 @@
 
 from PIL import Image, ImageDraw
 import sys,math,os,json
+from ordereddict import OrderedDict
 
 tilesize = 256
 reduction_factor = 2 ##reduce output imgage size by half (we don't need hires weight map)
@@ -46,22 +47,28 @@ for line in f.readlines():
         exit()
     
     tokens = line.strip().split()
-    info = {}
+    info = OrderedDict()
     for col in col_list:
         info[col] = tokens[col_list.index(col)]
-    
+
     x = float(info["X_IMAGE"])/reduction_factor
     y = float(info["Y_IMAGE"])/reduction_factor
+    
+    #remove out-of-bounds items 
+    if(x < 20 or x > (width - 20) or y < 20 or y > (height - 20)):
+        continue
+    else:
+        print x,y
 
     #if fwhm is present use it, otherwise set default
-    if "FWHM" in info:
-        r = int(float(info["FWHM"])/reduction_factor);
+    if "FWHM_IMAGE" in col_list:
+        r = int(float(info["FWHM_IMAGE"])/reduction_factor);
         if r < 3:
             r = 3
         if r > 20:
             r = 20
     else:
-        r = 5
+        r = 20
 
     #reverse x/y
     x = width - x
@@ -73,7 +80,6 @@ for line in f.readlines():
     #find tile id
     tile_id = int(x/tilesize) + int(y/tilesize)*cols
     tiles[tile_id].append({"type": "circle-pop", "x": x_off + r, "y": y_off, "r": r, "info": info})
-
     draw.ellipse((x-r,y-r,x+r,y+r), fill=(0,255,0))
 f.close()
 img.save(output_png, "PNG")
