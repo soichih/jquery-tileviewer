@@ -21,20 +21,15 @@ You can then create use TileViewer plugin to render your image by doing somethin
 ```
 <!DOCTYPE html>
 <html>
-<head>
-<link rel="stylesheet" href="https://raw.github.com/soichih/TileViewer/master/web/style.css" type="text/css"/>
-<title>TileViewer Demo</title>
-</head>
 <body>
 <h1>TileView Demo</h1>
-<div id="eso1208a" class="tileviewer"></div>
+<div id="demo" class="tileviewer"></div>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
 <script src="http://soichih.github.io/jquery-tileviewer/jquery.mousewheel.js"></script>
 <script src="http://soichih.github.io/jquery-tileviewer/jquery.tileviewer.js"></script>
 <script>
-$("#eso1208a").tileviewer({ src: "tiles/my_big_image" }).width("700").height("500"); 
+   $("#demo").tileviewer({ src: "tiles/my_big_image" }).width("700").height("500"); 
 </script>
-<footer><a href="https://sites.google.com/site/tileviewer/">Home</a></footer>
 </body>
 </html>
 ```
