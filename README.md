@@ -29,8 +29,8 @@ You can then create use TileViewer plugin to render your image by doing somethin
 <h1>TileView Demo</h1>
 <div id="eso1208a" class="tileviewer"></div>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-<script src="https://raw.github.com/soichih/TileViewer/master/web/jquery.mousewheel.js"></script>
-<script src="https://raw.github.com/soichih/TileViewer/master/web/jquery.tileviewer.js"></script>
+<script src="http://soichih.github.io/jquery-tileviewer/jquery.mousewheel.js"></script>
+<script src="http://soichih.github.io/jquery-tileviewer/jquery.tileviewer.js"></script>
 <script>
 $("#eso1208a").tileviewer({ src: "eso1208a", magnifier: true }).width("700").height("500"); 
 </script>
