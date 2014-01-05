@@ -32,7 +32,7 @@ You can then create use TileViewer plugin to render your image by doing somethin
 <script src="http://soichih.github.io/jquery-tileviewer/jquery.mousewheel.js"></script>
 <script src="http://soichih.github.io/jquery-tileviewer/jquery.tileviewer.js"></script>
 <script>
-$("#eso1208a").tileviewer({ src: "eso1208a", magnifier: true }).width("700").height("500"); 
+$("#eso1208a").tileviewer({ src: "tiles/my_big_image" }).width("700").height("500"); 
 </script>
 <footer><a href="https://sites.google.com/site/tileviewer/">Home</a></footer>
 </body>
