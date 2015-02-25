@@ -192,8 +192,12 @@ var methods = {
                                 view.draw_json(layer, ctx, img.json, x, y);
                             } else {
                                 //try to align at N.5 position
-                                var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
-                                var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
+                                //var xpos = ((layer.xpos+x*layer.tilesize)|0)+0.5;
+                                //var ypos = ((layer.ypos+y*layer.tilesize)|0)+0.5;
+
+                                //it looks like we don't need to do +0.5 anymore
+                                var xpos = (layer.xpos+x*layer.tilesize)|0;
+                                var ypos = (layer.ypos+y*layer.tilesize)|0;
 
                                 ctx.drawImage(img, xpos,ypos, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
