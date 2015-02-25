@@ -1,0 +1,27 @@
+{
+  "name": "tileviewer",
+  "version": "1.0.0",
+  "homepage": "https://github.com/soichih/TileViewer",
+  "authors": [
+    "Soichi Hayashi <hayashis@iu.edu>"
+  ],
+  "description": "A jquery plugin for Google Map like image viewer for a large image",
+  "main": "web/jquery.tileviewer.js",
+  "moduleType": [
+    "es6"
+  ],
+  "keywords": [
+    "tileviewer"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery-mousewheel": "~3.1.12"
+  }
+}
