@@ -511,9 +511,8 @@ var methods = {
                         //*before* changing tilesize, adjust offset so that we will zoom into where the cursor is
                         var dist_from_x0 = x - layer.xpos;
                         var dist_from_y0 = y - layer.ypos;
-                    
-                        layer.xpos -= dist_from_x0/layer.tilesize*delta;
-                        layer.ypos -= dist_from_y0/layer.tilesize*delta;
+                        layer.xpos -= Math.ceil(dist_from_x0/layer.tilesize*delta);
+                        layer.ypos -= Math.ceil(dist_from_y0/layer.tilesize*delta);
 
                         layer.tilesize += delta;
 
@@ -776,8 +775,8 @@ var methods = {
                             //center image
                             if(layer.id == "master") {
                                 var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
-                                layer.xpos = view.canvas.clientWidth/2-layer.info.width/2/factor;
-                                layer.ypos = view.canvas.clientHeight/2-layer.info.height/2/factor;
+                                layer.xpos = Math.round(view.canvas.clientWidth/2-layer.info.width/2/factor);
+                                layer.ypos = Math.round(view.canvas.clientHeight/2-layer.info.height/2/factor);
                             } else {
                                 //use master layer position for overlay
                                 var master = view.layers[0];
