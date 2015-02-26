@@ -504,7 +504,9 @@ var methods = {
                         //don't let it shrink too much
                         if(layer.level == layer.info._maxlevel-1 && layer.tilesize+delta < layer.info.tilesize/2) return false;
                         //don't let overzoom
-                        if(layer.level == 0 && layer.tilesize+delta > layer.info.tilesize*options.maximum_pixelsize) return false;
+                        if(layer.level == 0 && layer.tilesize+delta > layer.info.tilesize*options.maximum_pixelsize) {
+                            delta = layer.info.tilesize - layer.tilesize;
+                        }
 
                         //*before* changing tilesize, adjust offset so that we will zoom into where the cursor is
                         var dist_from_x0 = x - layer.xpos;
