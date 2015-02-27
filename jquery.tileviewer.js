@@ -110,6 +110,10 @@ var methods = {
                             
                         }
                         var ctx = view.canvas.getContext("2d");
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.webkitImageSmoothingEnabled = false;
+                        ctx.mozImageSmoothingEnabled = false;
+                        ctx.msImageSmoothingEnabled = false;
                         view.canvas.width = $this.width();//clear canvas
                         view.canvas.height = $this.height();//clear canvas
 
