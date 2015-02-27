@@ -107,13 +107,14 @@ var methods = {
                         view.needdraw = false;
                         if(options.debug) {
                             var start = new Date().getTime();
-                            
                         }
                         var ctx = view.canvas.getContext("2d");
+                        /* somehow, this doesn't get applied if I don't this right before drawImage..
                         ctx.imageSmoothingEnabled = false;
                         ctx.webkitImageSmoothingEnabled = false;
                         ctx.mozImageSmoothingEnabled = false;
                         ctx.msImageSmoothingEnabled = false;
+                        */
                         view.canvas.width = $this.width();//clear canvas
                         view.canvas.height = $this.height();//clear canvas
 
@@ -148,6 +149,11 @@ var methods = {
                             if(master_layer.info) {
                                 view.draw_mode(master_layer, ctx);
                             }
+                        }
+
+                        if(options.debug) {
+                            var end = new Date().getTime();
+                            $("#debug").html("w:"+view.canvas.width+" h:"+view.canvas.height+" "+(end-start)+" msec");
                         }
                     },
 
@@ -203,6 +209,10 @@ var methods = {
                                 var xpos = (layer.xpos+x*layer.tilesize)|0;
                                 var ypos = (layer.ypos+y*layer.tilesize)|0;
 
+                                ctx.imageSmoothingEnabled = false;
+                                ctx.webkitImageSmoothingEnabled = false;
+                                ctx.mozImageSmoothingEnabled = false;
+                                ctx.msImageSmoothingEnabled = false;
                                 ctx.drawImage(img, xpos,ypos, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
                             }
@@ -251,6 +261,10 @@ var methods = {
                                 if(x == layer.xtilenum-1) sw = layer.tilesize_xlast/factor;
                                 var sh = half_tilesize;
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
+                                ctx.imageSmoothingEnabled = false;
+                                ctx.webkitImageSmoothingEnabled = false;
+                                ctx.mozImageSmoothingEnabled = false;
+                                ctx.msImageSmoothingEnabled = false;
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
                                 return;
