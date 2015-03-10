@@ -848,6 +848,13 @@ var methods = {
                     var x = e.pageX - offset.left;
                     var y = e.pageY - offset.top;
 
+                    for(var i=0;i<view.plugins.length; i++) {
+                        var plugin = view.plugins[i];
+                        if(plugin.onmousedown) {
+                            plugin.onmousedown.call(plugin, view, e, x, y);
+                        }
+                    }
+
                     if(e.button != 2) { //not right button
                         view.mousedown = true;
 
