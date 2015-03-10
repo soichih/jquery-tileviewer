@@ -759,7 +759,12 @@ var methods = {
                             //tile loader
                             loader: {
                                 loading: 0, //actual number of images that are currently loaded
-                                max_loading: 3, //max number of image that can be loaded simultaneously
+
+                                //3 v.s. 6 doesn't seem to make much difference on single server..
+                                //I need to do a lot more through testings on this..
+                                //ref. http://www.stevesouders.com/blog/2008/03/20/roundup-on-parallel-connections/
+                                max_loading: 6, //max number of image that can be loaded simultaneously
+
                                 max_queue: 50, //max number of images that can be queued to be loaded
                                 queue: [], //FIFO queue for requested images
                                 tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
