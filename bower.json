@@ -1,10 +1,6 @@
 {
   "name": "tileviewer",
-<<<<<<< HEAD
   "version": "1.0.5",
-=======
-  "version": "1.0.3",
->>>>>>> parent of 0f85106... updated version number for bower
   "homepage": "https://github.com/soichih/TileViewer",
   "authors": [
     "Soichi Hayashi <hayashis@iu.edu>"
