@@ -72,7 +72,8 @@ var methods = {
                     layers: [
                         //you can add as many layers as you want.. layers[0] is master
                     ],
-                    canvas: document.createElement("canvas"),
+                    canvas: null,
+                    control_canvas: null,
                     mode: null, //current mouse left button mode (pan, sel2d, sel1d, etc..)
                     pan: {
                         //pan destination
@@ -96,6 +97,7 @@ var methods = {
                     mousedown: false,
                     mousedown_r: false,//right mouse button
                     needdraw: false, //flag used to request for frameredraw 
+                    needdraw_control: false, //flag used to request control canvas redraw
                 
                     debug_lastdraw: 0,
 
@@ -115,8 +117,9 @@ var methods = {
                         ctx.mozImageSmoothingEnabled = false;
                         ctx.msImageSmoothingEnabled = false;
                         */
-                        view.canvas.width = $this.width();//clear canvas
-                        view.canvas.height = $this.height();//clear canvas
+                        //clear & resize
+                        view.canvas.width = $this.width();
+                        view.canvas.height = $this.height();
 
                         if(view.layers.length > 0)  {
                             //draw master layer
@@ -145,19 +148,26 @@ var methods = {
                                 }
                             }
 
-                            //draw interactive elements
+                            /*
                             if(master_layer.info) {
-                                view.draw_mode(master_layer, ctx);
+                                view.draw_controls();
                             }
+                            */
                         }
 
                         if(options.debug) {
                             var end = new Date().getTime();
-                            $("#debug").html("w:"+view.canvas.width+" h:"+view.canvas.height+" "+(end-start)+" msec");
+                            $this.find(".tv-status").html("w:"+view.canvas.width+" h:"+view.canvas.height+" "+(end-start)+" msec");
                         }
                     },
 
-                    draw_mode: function(layer, ctx) {
+                    draw_controls: function() {
+                        view.needdraw_control = false;
+                        var ctx = view.control_canvas.getContext("2d");
+                        //clear & resize
+                        view.control_canvas.width = $this.width();
+                        view.control_canvas.height = $this.height();
+
                         switch(view.mode) {
                         case "select_1d":
                             view.draw_select_1d(ctx);
@@ -360,6 +370,11 @@ var methods = {
                             };
                             layer.tiles[url] = img; //register in dictionary
                             layer.loader.tile_count++;
+                            /*
+                            if(options.debug) {
+                                console.log("tile count"+layer.loader.tile_count);
+                            }
+                            */
                         }
 
                         //remove if already requested (so that I can add it back at the top)
@@ -423,56 +438,76 @@ var methods = {
                     },
 
                     draw_select_1d: function(ctx) {
+                        ctx.shadowColor = '#333';
+                        ctx.shadowBlur = 5;
+                        
                         //draw line..
+                        ctx.lineWidth = 2;
                         ctx.beginPath();
                         ctx.moveTo(view.select.x, view.select.y);
                         ctx.lineTo(view.select.x + view.select.width, view.select.y + view.select.height);
                         if(view.select.width == 0 || view.select.height == 0) {
                             //snapped
-                            ctx.strokeStyle = "#0cc";
+                            ctx.strokeStyle = "#ccc";
                         } else {
                             ctx.strokeStyle = "#0c0";
                         }
-                        ctx.lineWidth = 3;
                         ctx.stroke();
 
-                        //draw grabbers & line between
+                        //draw grabbers
+                        ctx.fillStyle = "#0c0";
+                        ctx.strokeStyle = '#fff'; 
+
                         ctx.beginPath();
                         ctx.arc(view.select.x, view.select.y,options.graber_size/2,0,Math.PI*2,false);
-                        ctx.arc(view.select.x+view.select.width, view.select.y+view.select.height,options.graber_size/2,0,Math.PI*2,false);
-                        ctx.fillStyle = "#0c0";
                         ctx.fill();
-                    },
-
-                    draw_select_2d: function(ctx) {
-                        ctx.shadowOffsetX = 0;
-                        ctx.shadowOffsetY = 0;
-                        ctx.shadowBlur    = 0;
-                        ctx.shadowColor   = 'rgba(0,0,0,0)';
-                        ctx.strokeStyle = '#0c0'; 
-                        ctx.lineWidth   = 2;
-                        ctx.fillStyle = '#0c0';
-
-                        //draw box
-                        ctx.strokeRect(view.select.x, view.select.y, view.select.width, view.select.height);
-
-                        //draw grabbers
-                        ctx.beginPath();
-                        ctx.arc(view.select.x, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topleft
-                        ctx.fill();
-
-                        ctx.beginPath();
-                        ctx.arc(view.select.x+view.select.width, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topright
-                        ctx.fill();
-
-                        ctx.beginPath();
-                        ctx.arc(view.select.x, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomleft
-                        ctx.fill();
+                        ctx.stroke();
 
                         ctx.beginPath();
                         ctx.arc(view.select.x+view.select.width, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomright
                         ctx.fill();
+                        ctx.stroke();
+                    },
 
+                    draw_select_2d: function(ctx) {
+                        ctx.shadowColor   = '#333';
+                        ctx.shadowBlur    = 5;
+
+                        ctx.strokeStyle = '#0c0'; 
+                        ctx.lineWidth   = 2;
+
+                        //fill box
+                        ctx.beginPath();
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+                        ctx.fillRect(view.select.x, view.select.y, view.select.width, view.select.height);
+                        ctx.fill();
+
+                        ctx.strokeRect(view.select.x, view.select.y, view.select.width, view.select.height);
+                        ctx.stroke();
+
+                        //draw grabbers
+                        ctx.fillStyle = '#0c0';
+                        ctx.strokeStyle = '#fff'; 
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topleft
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x+view.select.width, view.select.y, options.graber_size/2, 0, Math.PI*2, false);//topright
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomleft
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x+view.select.width, view.select.y+view.select.height, options.graber_size/2, 0, Math.PI*2, false);//bottomright
+                        ctx.fill();
+                        ctx.stroke();
                     },
 
                     recalc_viewparams: function(layer) {
@@ -768,7 +803,7 @@ var methods = {
                                 max_queue: 50, //max number of images that can be queued to be loaded
                                 queue: [], //FIFO queue for requested images
                                 tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
-                                max_tiles: 200 //max number of images that can be stored in tiles dictionary
+                                max_tiles: 100 //max number of images that can be stored in tiles dictionary
                             },
                             tiles: []//tiles dictionary 
                         };
@@ -823,26 +858,111 @@ var methods = {
 			    }
                         });
                     }
-                };//view definition
+                    /*
+                    handler_move: function() {
+                        var pos = view.handler_client_pos();
+                        view.handler_connector.css("width", pos.width);
+                        view.handler_connector.css("height", pos.height);
+                        view.handler_connector.css("left", pos.left);
+                        view.handler_connector.css("top", pos.top);
+
+                        var con_canvas = view.handler_connector[0];
+                        con_canvas.width = pos.width;
+                        con_canvas.height = pos.height;
+                        var ctx = con_canvas.getContext("2d");
+
+                        ctx.strokeStyle = '#0c0';
+                        ctx.shadowBlur = 5;
+                        ctx.shadowColor = '#000';
+                        ctx.lineWidth=3;
+
+                        //draw line
+                        var pos1 = view.handler1.position();
+                        var pos2 = view.handler2.position();
+                        ctx.beginPath();
+                        var d_left = pos1.left - pos2.left;
+                        var d_top = pos1.top - pos2.top;
+                        if(d_left * d_top > 0) {
+                            ctx.moveTo(0,0);
+                            ctx.lineTo(pos.width, pos.height);
+                        } else {
+                            ctx.moveTo(0,pos.height);
+                            ctx.lineTo(pos.width, 0);
+                        }
+                        
+                        //draw box
+                        ctx.rect(0,0,pos.width, pos.height);
+
+                        ctx.stroke();
+                    },
+                    
+                    //return left, top, right, buttom client coordinates
+                    handler_client_pos: function() {
+                        var pos1 = view.handler1.position();
+                        var pos2 = view.handler2.position();
+                        var width = Math.abs(pos1.left - pos2.left);
+                        var height = Math.abs(pos1.top - pos2.top);
+                        var left = Math.min(pos1.left, pos2.left)+10;
+                        var top = Math.min(pos1.top, pos2.top)+10;
+                        return {top: top, left: left, width: width, height: height};
+                    }
+                    */
+                };//end view definition
+
                 $this.data("view", view);
-
-                //setup views
                 $this.addClass("tileviewer");
-                $(view.canvas).css("background-color", "#222");
 
+                view.control_canvas = document.createElement("canvas"); //$("<canvas class='tv-control-canvas'/>");
+                $(view.control_canvas).addClass("tv-control-canvas");
+                $this.append(view.control_canvas);
+
+                view.canvas = document.createElement("canvas"); //$("<canvas class='tv-canvas' style='background-color: #222'/>");
+                $(view.canvas).css("background-color", "#222");
                 $this.append(view.canvas);
                 methods.setmode.call($this, {mode: "pan"});
+
+
+                /*
+                view.handler_connector = $("<canvas class='tv-handler-connector'/>");
+                $this.append(view.handler_connector);
+
+                function create_handler(x, y) {
+                    var handler = $("<div class='tv-handler'/>");
+                    handler.draggable({
+                        drag: view.handler_move,
+                        containment: 'parent'
+                    });
+                    handler.css("top", x);
+                    handler.css("left", y);
+                    return handler;
+                }
+                view.handler1 = create_handler(50, 50);
+                $this.append(view.handler1);
+                view.handler2 = create_handler(200, 200);
+                $this.append(view.handler2);
+
+                view.handler_move(); //to get connector initialized
+                */
+
+                var status_view = $("<div class='tv-status'>status</div>");
+                $this.append(status_view);
 
                 //add master layer
                 view.addlayer({id: "master", src: options.src, enable: true});
 
                 //redraw thread - read http://ejohn.org/blog/how-javascript-timers-work/
                 setInterval(function() {
+
+                    //I might deprecate this
                     if(view.pan.xdest) {
                         view.pan();
                     }
+
                     if(view.needdraw) {
                         view.draw();
+                    }
+                    if(view.needdraw_control) {
+                        view.draw_controls();
                     }
                 }, 16);
 
@@ -864,23 +984,6 @@ var methods = {
                         view.mousedown = true;
 
                         var layer = view.layers[0];
-
-                        /*
-                        //mode specific extra info
-                        switch(view.mode) {
-                        case "pan":
-                            view.pan.xdest = null;//cancel pan
-                            view.pan.xhot = x - layer.xpos;
-                            view.pan.yhot = y - layer.ypos;
-                            document.body.style.cursor="move";
-                            break;
-                        case "select_1d":
-                            view.select.item = view.hittest_select_1d(x,y);
-                            break;
-                        case "select_2d":
-                            view.select.item = view.hittest_select_2d(x,y);
-                        }
-                        */
 
                         switch(view.mode) {
                         case "select_1d":
@@ -947,14 +1050,15 @@ var methods = {
                     view.ynow = y;
 
                     if(view.mousedown) {
-                        //dragging
+                        //dragging?
                         if(view.select.item == null) {
-                            //view panning
+                            //nope, just panning a view
                             for(var i=0; i<view.layers.length; i++) {
                                 var layer = view.layers[i];
                                 layer.xpos = x - view.pan.xhot;
                                 layer.ypos = y - view.pan.yhot;
                             }
+                            view.needdraw = true;//don't use view.draw() - firefox will freeze up if you hold cpu on mouse event handler
                         } else {
                             switch(view.mode) {
                             case "select_1d":
@@ -1016,8 +1120,8 @@ var methods = {
                                 }
                                 break;
                             }
+                            view.needdraw_control = true;
                         }
-                        view.needdraw = true;//don't use view.draw() - firefox will freeze up if you hold cpu on mouse event handler
                     } else {
                         //just hovering
                         switch(view.mode) {
@@ -1241,7 +1345,8 @@ var methods = {
             }
 
             view.mode = options.mode;
-            view.needdraw = true;
+            //view.needdraw = true;
+            view.draw_controls();
         });
     }
 
