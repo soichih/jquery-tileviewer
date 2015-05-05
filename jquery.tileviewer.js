@@ -110,22 +110,27 @@ var methods = {
                         if(options.debug) {
                             var start = new Date().getTime();
                         }
+
                         var ctx = view.canvas.getContext("2d");
-                        /* somehow, this doesn't get applied if I don't this right before drawImage..
-                        ctx.imageSmoothingEnabled = false;
-                        ctx.webkitImageSmoothingEnabled = false;
-                        ctx.mozImageSmoothingEnabled = false;
-                        ctx.msImageSmoothingEnabled = false;
-                        */
                         //clear & resize
                         view.canvas.width = $this.width();
                         view.canvas.height = $this.height();
 
+                        //prevent weird artifact caused by image resizing
+                        ctx.imageSmoothingEnabled = false;
+                        ctx.webkitImageSmoothingEnabled = false;
+                        ctx.mozImageSmoothingEnabled = false;
+                        ctx.msImageSmoothingEnabled = false;
+
                         if(view.layers.length > 0)  {
                             //draw master layer
                             var master_layer = view.layers[0];
+                            if(!master_layer.info) {
+                                //console.log("waiting on maste layer info");
+                                return;
+                            }
                             view.draw_tiles(master_layer, ctx);
-
+                            
                             //apply layer plugins
                             var imagedata = null;
                             for(var i=0;i<view.plugins.length; i++) {
@@ -133,8 +138,15 @@ var methods = {
                                 if(imagedata == null) {
                                     imagedata = ctx.getImageData(0,0,view.canvas.width, view.canvas.height);
                                 }
-                                plugin.onlayer.call(plugin, view, ctx, imagedata);
+                                if(plugin.onimagedata) {
+                                    plugin.onimagedata.call(plugin, view, ctx, imagedata);
+                                }
+                                //onlayer depreacted - use onimagedata instead
+                                if(plugin.onlayer) {
+                                    plugin.onlayer.call(plugin, view, ctx, imagedata);
+                                }
                             }
+                            
                             //blit
                             if(imagedata != null) {
                                 ctx.putImageData(imagedata,0,0);
@@ -147,19 +159,35 @@ var methods = {
                                     view.draw_tiles(overlay_layer, ctx);
                                 }
                             }
-
-                            /*
-                            if(master_layer.info) {
-                                view.draw_controls();
+                            
+                            //allow plugin to do last minute drawing on canvas
+                            for(var i=0;i<view.plugins.length; i++) {
+                                var plugin = view.plugins[i];
+                                if(plugin.ondraw) {
+                                    plugin.ondraw.call(plugin, view, ctx);
+                                }
                             }
-                            */
-                        }
+                         }
 
                         if(options.debug) {
                             var end = new Date().getTime();
                             $this.find(".tv-status").html("w:"+view.canvas.width+" h:"+view.canvas.height+" "+(end-start)+" msec");
                         }
                     },
+
+                    /*
+                    draw_markers: function(layer, ctx) {
+                        //draw line..
+                        ctx.beginPath();
+                        var pos = view.pixel2client(layer, 0, 0);
+                        ctx.moveTo(pos.x, pos.y);
+                        var pos = view.pixel2client(layer, 12000, 13500);
+                        ctx.lineTo(pos.x, pos.y);
+                        ctx.lineWidth = 5;
+                        ctx.strokeStyle = "#c00";
+                        ctx.stroke();
+                    },
+                    */
 
                     draw_controls: function() {
                         view.needdraw_control = false;
@@ -169,12 +197,12 @@ var methods = {
                         view.control_canvas.height = $this.height();
 
                         switch(view.mode) {
-                        case "select_1d":
-                            view.draw_select_1d(ctx);
-                            break;
                         case "select_2d":
-                            view.draw_select_2d(ctx);
-                            break;
+                            view.draw_select_2d(ctx); break;
+                        case "select_1d":
+                            view.draw_select_1d(ctx); break;
+                        case "select_0d":
+                            view.draw_select_0d(ctx); break;
                         }
                     },
 
@@ -190,6 +218,7 @@ var methods = {
                                 view.draw_tile(layer, ctx,x,y);
                             }
                         }
+    
                         view.loader_process(layer);
                     },
 
@@ -219,10 +248,12 @@ var methods = {
                                 var xpos = (layer.xpos+x*layer.tilesize)|0;
                                 var ypos = (layer.ypos+y*layer.tilesize)|0;
 
+                                /*
                                 ctx.imageSmoothingEnabled = false;
                                 ctx.webkitImageSmoothingEnabled = false;
                                 ctx.mozImageSmoothingEnabled = false;
                                 ctx.msImageSmoothingEnabled = false;
+                                */
                                 ctx.drawImage(img, xpos,ypos, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
                             }
@@ -271,10 +302,12 @@ var methods = {
                                 if(x == layer.xtilenum-1) sw = layer.tilesize_xlast/factor;
                                 var sh = half_tilesize;
                                 if(y == layer.ytilenum-1) sh = layer.tilesize_ylast/factor;
+                                /*
                                 ctx.imageSmoothingEnabled = false;
                                 ctx.webkitImageSmoothingEnabled = false;
                                 ctx.mozImageSmoothingEnabled = false;
                                 ctx.msImageSmoothingEnabled = false;
+                                */
                                 ctx.drawImage(img, sx, sy, sw, sh, layer.xpos+x*layer.tilesize, layer.ypos+y*layer.tilesize, xsize,ysize);
                                 img.timestamp = new Date().getTime();//update last access timestamp
                                 return;
@@ -285,6 +318,7 @@ var methods = {
 
                     },
 
+                    //TODO -- I should probably deprecate this and move it to ImageEx...?
                     draw_json: function(layer, ctx, json, x, y) {
                         var zoomfactor = layer.tilesize/layer.info.tilesize;
 
@@ -437,6 +471,20 @@ var methods = {
                         }
                     },
 
+                    draw_select_0d: function(ctx) {
+                        ctx.shadowColor = '#333';
+                        ctx.shadowBlur = 5;
+                        
+                        //draw grabber
+                        ctx.fillStyle = "#0c0";
+                        ctx.strokeStyle = '#fff'; 
+
+                        ctx.beginPath();
+                        ctx.arc(view.select.x, view.select.y,options.graber_size/2,0,Math.PI*2,false);
+                        ctx.fill();
+                        ctx.stroke();
+                    },
+
                     draw_select_1d: function(ctx) {
                         ctx.shadowColor = '#333';
                         ctx.shadowBlur = 5;
@@ -478,7 +526,7 @@ var methods = {
 
                         //fill box
                         ctx.beginPath();
-                        ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+                        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
                         ctx.fillRect(view.select.x, view.select.y, view.select.width, view.select.height);
                         ctx.fill();
 
@@ -537,10 +585,20 @@ var methods = {
 
                     //calculate pixel position based on client x/y
                     client2pixel: function(layer, client_x, client_y) {
+                        if(layer.info == undefined) debugger;
                         var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
                         var pixel_x = Math.round((client_x - layer.xpos)*factor);
                         var pixel_y = Math.round((client_y - layer.ypos)*factor);
                         return {x: pixel_x, y: pixel_y};
+                    },
+                    
+                    //inverse of client2pixel
+                    pixel2client: function(layer, x, y) {      
+                        //if(layer.tilesize == undefined) debugger;
+                        var factor = Math.pow(2,layer.level) * layer.info.tilesize / layer.tilesize;
+                        var client_x = x/factor + layer.xpos;
+                        var client_y = y/factor + layer.ypos;
+                        return {x: client_x, y: client_y};
                     },
 
                     //calculate pixel potision on the center
@@ -605,9 +663,15 @@ var methods = {
                     pan: function() {
                         var layer = view.layers[0];
 
+                        var pos = view.pixel2client(layer, view.pan.xdest, view.pan.ydest);
+                        xdest_client = pos.x;
+                        ydest_client = pos.y;
+                        /*
                         var factor = Math.pow(2,layer.level)*layer.info.tilesize/layer.tilesize;
                         var xdest_client = view.pan.xdest/factor + layer.xpos;
                         var ydest_client = view.pan.ydest/factor + layer.ypos;
+                        */
+
                         var center = view.center_pixelpos(layer);
                         var dx = center.x - view.pan.xdest;
                         var dy = center.y - view.pan.ydest;
@@ -711,6 +775,14 @@ var methods = {
                         }
                         return null;
                     },
+                    /*
+                    hittest_select_0d: function(x,y) {
+                        if(view.inside(x,y, 
+                            view.select.x-options.graber_size/2, 
+                            view.select.y-options.graber_size/2,
+                            options.graber_size, options.graber_size)) return "topleft";
+                        return null;
+                    },
 
                     hittest_select_1d: function(x,y) {
                         if(view.inside(x,y, 
@@ -748,10 +820,6 @@ var methods = {
                             view.select.y-options.graber_size/2,
                             options.graber_size, options.graber_size)) return "topleft";
                         if(view.inside(x,y, 
-                            view.select.x-options.graber_size/2, 
-                            view.select.y-options.graber_size/2,
-                            options.graber_size, options.graber_size)) return "topleft";
-                        if(view.inside(x,y, 
                             view.select.x-options.graber_size/2+view.select.width, 
                             view.select.y-options.graber_size/2, 
                             options.graber_size, options.graber_size)) return "topright";
@@ -767,6 +835,59 @@ var methods = {
                             view.select.x, view.select.y,
                             view.select.width, view.select.height)) return "inside";
                          return null;
+                    },
+                    */
+                    hittest: function(x,y) {
+                        //grabber tests
+                        switch(view.mode) {
+                            case "select_2d":
+                                if(view.inside(x,y, 
+                                    view.select.x-options.graber_size/2+view.select.width, 
+                                    view.select.y-options.graber_size/2, 
+                                    options.graber_size, options.graber_size)) return "topright";
+                                if(view.inside(x,y,
+                                    view.select.x-options.graber_size/2, 
+                                    view.select.y-options.graber_size/2+view.select.height,
+                                    options.graber_size, options.graber_size)) return "bottomleft";
+                            case "select_1d":
+                                if(view.inside(x,y,
+                                    view.select.x-options.graber_size/2+view.select.width, 
+                                    view.select.y-options.graber_size/2+view.select.height,
+                                    options.graber_size, options.graber_size)) return "bottomright";
+                            case "select_0d":
+                                if(view.inside(x,y, 
+                                    view.select.x-options.graber_size/2, 
+                                    view.select.y-options.graber_size/2,
+                                    options.graber_size, options.graber_size)) return "topleft";
+                        }
+
+                        //inside tests
+                        if(view.mode == "select_1d") {
+                            var grabber_d4 = options.graber_size;
+                            if(view.select.width == 0 || view.select.height == 0) {
+                                //verticaly or horizontaly alinged
+                                if(view.inside(x-grabber_d4/2,y-grabber_d4/2, 
+                                Math.min(view.select.x, view.select.x + view.select.width)-grabber_d4, 
+                                Math.min(view.select.y, view.select.y + view.select.height)-grabber_d4, 
+                                Math.abs(view.select.width)+grabber_d4, 
+                                Math.abs(view.select.height)+grabber_d4)) {
+                                    return "inside";
+                                }
+                            } else if(view.inside(x,y, view.select.x, view.select.y, view.select.width, view.select.height)) {
+                                //do line / point distance test using slope difference
+                                var lhs = (x-view.select.x)*(view.select.y + view.select.height-view.select.y);
+                                var rhs = (view.select.x + view.select.width-view.select.x)*(y-view.select.y);
+                                if(Math.abs(lhs - rhs) < 2000) return "inside";
+                            }
+                        }
+
+                        if(view.mode == "select_2d") {
+                            if(view.inside(x,y, 
+                                view.select.x, view.select.y,
+                                view.select.width, view.select.height)) return "inside";
+                        }
+
+                        return null; //no hit 
                     },
 
                     addlayer: function(options) {
@@ -800,10 +921,14 @@ var methods = {
                                 //ref. http://www.stevesouders.com/blog/2008/03/20/roundup-on-parallel-connections/
                                 max_loading: 6, //max number of image that can be loaded simultaneously
 
-                                max_queue: 50, //max number of images that can be queued to be loaded
+                                //max number of images that can be queued to be loaded
+                                max_queue: 200, 
                                 queue: [], //FIFO queue for requested images
                                 tile_count: 0, //number of tiles in tile dictionary (not all of them are actually loaded)
-                                max_tiles: 100 //max number of images that can be stored in tiles dictionary
+                                //max number of images that can be stored in tiles dictionary
+                                //for 256 tiles, any smaller than around 300 makes it impossible for page to reload
+                                //since it can't even contain the single frame for window size at 2560x1440
+                                max_tiles: 300 
                             },
                             tiles: []//tiles dictionary 
                         };
@@ -815,7 +940,8 @@ var methods = {
                             if(layer.id != "master") {
                                 var master = view.layers[0];
                                 if(master.info == null) {          
-                                    setTimeout(function() {process_layer_info(data, layer);}, 500);
+                                    //if master is not loaded (yet), then it will be, so no need to set timeout for that to happen
+                                    //setTimeout(function() {process_layer_info(data, layer);}, 500);
                                     return;
                                 }
                             }
@@ -951,7 +1077,8 @@ var methods = {
                 view.addlayer({id: "master", src: options.src, enable: true});
 
                 //redraw thread - read http://ejohn.org/blog/how-javascript-timers-work/
-                setInterval(function() {
+                function draw_thread() {
+                //setInterval(function() {
 
                     //I might deprecate this
                     if(view.pan.xdest) {
@@ -964,7 +1091,10 @@ var methods = {
                     if(view.needdraw_control) {
                         view.draw_controls();
                     }
-                }, 16);
+                //}, 16);
+                    requestAnimationFrame(draw_thread);
+                };
+                requestAnimationFrame(draw_thread);
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
@@ -985,7 +1115,11 @@ var methods = {
 
                         var layer = view.layers[0];
 
+                        /*
                         switch(view.mode) {
+                        case "select_0d":
+                            view.select.item = view.hittest_select_0d(x,y);
+                            break;
                         case "select_1d":
                             view.select.item = view.hittest_select_1d(x,y);
                             break;
@@ -993,6 +1127,8 @@ var methods = {
                             view.select.item = view.hittest_select_2d(x,y);
                             break;
                         }
+                        */
+                        view.select.item = view.hittest(x,y);
                         if(view.select.item == null) {
                             view.pan.xdest = null;//cancel pan
                             view.pan.xhot = x - layer.xpos;
@@ -1001,6 +1137,7 @@ var methods = {
                         }
                         
                         switch(view.mode) {
+                        case "select_0d":
                         case "select_1d":
                         case "select_2d":
                             view.select.xhot = x - view.select.x;
@@ -1060,6 +1197,50 @@ var methods = {
                             }
                             view.needdraw = true;//don't use view.draw() - firefox will freeze up if you hold cpu on mouse event handler
                         } else {
+                            switch(view.select.item) {
+                            case "inside":
+                                view.select.x = x - view.select.xhot;
+                                view.select.y = y - view.select.yhot;
+                                break;
+                            case "topleft":
+                                view.select.x = x - view.select.xhot;
+                                view.select.y = y - view.select.yhot;
+                                view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
+                                view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                if(view.mode == "select_1d") {
+                                    //snap
+                                    if(Math.abs(view.select.width) < 20) {
+                                        view.select.x = x + view.select.width - view.select.xhot;
+                                        view.select.width = 0;
+                                    }
+                                    if(Math.abs(view.select.height) < 20) {
+                                        view.select.y = y + view.select.height - view.select.yhot;
+                                        view.select.height = 0;
+                                    }
+                                }
+                                break;
+                            case "topright":
+                                view.select.y = y - view.select.yhot;
+                                view.select.width = x - view.select.whot;
+                                view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
+                                break;
+                            case "bottomleft":
+                                view.select.x = x - view.select.xhot;
+                                view.select.height = y - view.select.hhot;
+                                view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
+                                break;
+                            case "bottomright":
+                                view.select.width = x - view.select.whot;
+                                view.select.height = y - view.select.hhot;
+                                if(view.mode == "select_1d") {
+                                    //snap
+                                    if(Math.abs(view.select.width) < 20) view.select.width = 0;
+                                    if(Math.abs(view.select.height) < 20) view.select.height = 0;
+                                }
+                                break;
+                            }
+ 
+                            /*
                             switch(view.mode) {
                             case "select_1d":
                                 switch(view.select.item) {
@@ -1120,6 +1301,7 @@ var methods = {
                                 }
                                 break;
                             }
+                            */
                             view.needdraw_control = true;
                         }
                     } else {
@@ -1133,38 +1315,47 @@ var methods = {
                                 options.onitemhover(view.hover);
                             }
                             break;
+                        /*
+                        case "select_0d":
+                            view.select.item = view.hittest_select_0d(x,y);
+                            break;
                         case "select_1d":
                             view.select.item = view.hittest_select_1d(x,y);
                             break;
                         case "select_2d":
                             view.select.item = view.hittest_select_2d(x,y);
                             break;
+                        */
+                        default:        
+                            view.select.item = view.hittest(x,y);
                         }
 
                         //set to right cursor
+                        var cursor = "auto";
                         switch(view.mode) {
                         case "pan":
-                            if(view.hover) {
-                                document.body.style.cursor="help";
-                            } else {
-                                document.body.style.cursor="auto";
+                            if(view.hover) cursor = "help";
+                            break;
+                        case "select_0d":
+                            switch(view.select.item) {
+                                case "topleft": cursor="move"; break;
                             }
                             break;
                         case "select_1d":
                         case "select_2d":
                             switch(view.select.item) {
                             case "inside": 
-                                document.body.style.cursor="move"; break;
+                                cursor="move"; break;
                             case "topleft": 
                             case "bottomright": 
-                                document.body.style.cursor="nw-resize"; break;
+                                cursor="nw-resize"; break;
                             case "topright": 
                             case "bottomleft": 
-                                document.body.style.cursor="ne-resize"; break;
-                            default: document.body.style.cursor="auto";
+                                cursor="ne-resize"; break;
                             }
                             break;
                         }
+                        document.body.style.cursor=cursor;
 
                         ///////////////////////////////////////////////////////////////////////////
                         //do interactive json (TODO - do we really have to do this every time mouse move?)
@@ -1331,6 +1522,10 @@ var methods = {
 
             switch(options.mode) {
             case "pan":
+                break;
+            case "select_0d":
+                view.select.x = view.canvas.clientWidth/2;
+                view.select.y = view.canvas.clientHeight/2;
                 break;
             case "select_1d":
             case "select_2d":
