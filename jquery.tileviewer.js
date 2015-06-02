@@ -578,8 +578,8 @@ var methods = {
                         return {
                             x: -layer.xpos*factor,
                             y: -layer.ypos*factor,
-                            width: view.canvas.clientWidth*factor,
-                            height: view.canvas.clientHeight*factor
+                            w: view.canvas.clientWidth*factor,
+                            h: view.canvas.clientHeight*factor
                         };
                     },
 
