@@ -2,7 +2,7 @@
 
 TileViewer HTML5 client
 
-    Version: 2.0.1
+    Version: (see package.json)
 
     This plugin is tested with following dependencies
     * JQuery 1.3.2
