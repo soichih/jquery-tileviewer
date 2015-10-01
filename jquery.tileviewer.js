@@ -666,11 +666,10 @@ var methods = {
                         var pos = view.pixel2client(layer, view.pan.xdest, view.pan.ydest);
                         xdest_client = pos.x;
                         ydest_client = pos.y;
-                        /*
+
                         var factor = Math.pow(2,layer.level)*layer.info.tilesize/layer.tilesize;
                         var xdest_client = view.pan.xdest/factor + layer.xpos;
                         var ydest_client = view.pan.ydest/factor + layer.ypos;
-                        */
 
                         var center = view.center_pixelpos(layer);
                         var dx = center.x - view.pan.xdest;
