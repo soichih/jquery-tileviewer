@@ -2,7 +2,7 @@
 
 TileViewer HTML5 client
 
-    Version: 2.0.1
+    Version: (see package.json)
 
     This plugin is tested with following dependencies
     * JQuery 1.3.2
@@ -679,49 +679,6 @@ var methods = {
                             view.recalc_viewparams(sub_layer);
                         }
                     },
-
-                    /*
-                    pan: function() {
-                        var layer = view.layers[0];
-
-                        var pos = view.pixel2client(layer, view.pan.xdest, view.pan.ydest);
-                        xdest_client = pos.x;
-                        ydest_client = pos.y;
- 
-                        var center = view.center_pixelpos(layer);
-                        var dx = center.x - view.pan.xdest;
-                        var dy = center.y - view.pan.ydest;
-                        var dist = Math.sqrt(dx*dx + dy*dy);
-
-
-                        //Step 1) if destination is not in client view - zoom out until we do (or we can't zoom out anymore)
-                        if(layer.level != layer.info._maxlevel && 
-                            (xdest_client < 0 || ydest_client < 0 || xdest_client > view.canvas.clientWidth || ydest_client > view.canvas.clientHeight)) {
-                            view.change_zoom(-5, view.canvas.clientWidth/2 + dx/dist*factor*50, view.canvas.clientHeight/2 + dy/dist*factor*50);
-                        } else {
-                            //Step 2a) Pan to destination
-                           if(dist >= factor) {
-                                layer.xpos += dx / factor / 10;
-                                layer.ypos += dy / factor / 10;
-                            }
-
-                            //Step 2b) Also, zoom in/out until destination level is reached
-                            var current_level = layer.level + layer.info.tilesize/layer.tilesize-1;
-                            var level_dist = Math.abs(view.pan.leveldest - current_level);
-                            if(level_dist >= 0.1) {
-                                var dzoom = 4;
-                                if(current_level < view.pan.leveldest) dzoom = -dzoom;
-                                view.change_zoom(dzoom, xdest_client*2 - view.canvas.clientWidth/2, ydest_client*2 - view.canvas.clientHeight/2);
-                            }
-
-                            if(dist < factor && level_dist < 0.1) {
-                                //reached destination
-                                view.pan.xdest = null;
-                            }
-                        }
-                        view.needdraw = true;
-                    },
-                    */
 
                     inside: function(xt,yt,x,y,w,h) {
                         //handle negative w/h
