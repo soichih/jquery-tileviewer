@@ -81,7 +81,7 @@ if __name__ == "__main__":
         # print n_tiles_x, n_tiles_y
 
         tile_number = 0
-        for tx, ty in itertools.product(range(n_tiles_x), range(n_tiles_y)):
+        for ty, tx in itertools.product(range(n_tiles_y), range(n_tiles_x)):
             # print tx, ty
 
             tile_area = (tx*options.tilesize,
