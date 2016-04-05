@@ -51,6 +51,7 @@ if __name__ == "__main__":
         "width": size[2],
         "height": size[3],
         "tilesize": options.tilesize,
+        "filetype": options.filetype,
         }
     main_tiles_dir = "%s/main_tiles" % (options.outdir)
     json_filename = "%s/info.json" % (main_tiles_dir)
