@@ -33,6 +33,20 @@ The MIT License
 */
 
 (function($){
+"use strict";
+
+// requestAnim shim layer by Paul Irish
+window.requestAnimFrame = (function(){
+  return  window.requestAnimationFrame       || 
+          window.webkitRequestAnimationFrame || 
+          window.mozRequestAnimationFrame    || 
+          window.oRequestAnimationFrame      || 
+          window.msRequestAnimationFrame     || 
+          function(/* function */ callback, /* DOMElement */ element){
+              window.setTimeout(callback, 1000 / 60);
+          };
+})();
+
 var methods = {
     ///////////////////////////////////////////////////////////////////////////////////
     // Initializes if it's not already initialized
@@ -40,6 +54,7 @@ var methods = {
 
         var defaults = {
             src: "http://soichi.odi.iu.edu/tileviewer/tiles/last_launch", //just a sample image
+            access_token: null, //set to jwt token if you are accessing access-controlled source
             empty: "#6f6", //color of empty (loading) tile - if no subtile is available
             width: 400, //canvas width - not image width
             height: 300, //canvas height - not image height
@@ -67,6 +82,20 @@ var methods = {
             // Now we can start initializing
             //If the plugin hasn't been initialized yet..
             var view = $this.data("view");
+            function draw_thread() {
+                //I might deprecate this
+                if(view.pan.xdest) {
+                    view.pan();
+                }
+
+                if(view.needdraw) {
+                    view.draw();
+                }
+                if(view.needdraw_control) {
+                    view.draw_controls();
+                }
+                requestAnimFrame(draw_thread);
+            };
             if(!view) {
                 var view = {
                     layers: [
@@ -112,7 +141,7 @@ var methods = {
                         }
 
                         var ctx = view.canvas.getContext("2d");
-                        //clear & resize
+                        //clear & match dimention with the size of container
                         view.canvas.width = $this.width();
                         view.canvas.height = $this.height();
 
@@ -175,24 +204,10 @@ var methods = {
                         }
                     },
 
-                    /*
-                    draw_markers: function(layer, ctx) {
-                        //draw line..
-                        ctx.beginPath();
-                        var pos = view.pixel2client(layer, 0, 0);
-                        ctx.moveTo(pos.x, pos.y);
-                        var pos = view.pixel2client(layer, 12000, 13500);
-                        ctx.lineTo(pos.x, pos.y);
-                        ctx.lineWidth = 5;
-                        ctx.strokeStyle = "#c00";
-                        ctx.stroke();
-                    },
-                    */
-
                     draw_controls: function() {
                         view.needdraw_control = false;
                         var ctx = view.control_canvas.getContext("2d");
-                        //clear & resize
+                        //clear & match dimention with the size of container
                         view.control_canvas.width = $this.width();
                         view.control_canvas.height = $this.height();
 
@@ -412,7 +427,7 @@ var methods = {
                         }
 
                         //remove if already requested (so that I can add it back at the top)
-                        for(id in layer.loader.queue) {
+                        for(var id in layer.loader.queue) {
                             var request = layer.loader.queue[id];
                             if(request === img) {
                                 layer.loader.queue = layer.loader.queue.splice(id, 1);
@@ -434,7 +449,8 @@ var methods = {
                                     var levelinfo = layer.info.levels[img.level_loaded_for];
                                     if(levelinfo == "json") {
                                         $.ajax({
-                                            url: img.request_src+".json", dataType: "json", 
+                                            url: img.request_src+".json", 
+                                            dataType: "json", 
                                             context: img
                                         }).done(function(data) {
                                                 this.json = data;
@@ -444,7 +460,11 @@ var methods = {
                                 }
                                                                 
                                 //do load the image
-                                img.src = img.request_src+".png";
+                                var src = img.request_src+".png";
+                                if(options.access_token) {
+                                    src += "?at="+options.access_token;
+                                }
+                                img.src = src;
                                 layer.loader.loading++;
                                 img.loading = true;
                             }
@@ -660,22 +680,19 @@ var methods = {
                         }
                     },
 
+                    /*
                     pan: function() {
                         var layer = view.layers[0];
 
                         var pos = view.pixel2client(layer, view.pan.xdest, view.pan.ydest);
                         xdest_client = pos.x;
                         ydest_client = pos.y;
-                        /*
-                        var factor = Math.pow(2,layer.level)*layer.info.tilesize/layer.tilesize;
-                        var xdest_client = view.pan.xdest/factor + layer.xpos;
-                        var ydest_client = view.pan.ydest/factor + layer.ypos;
-                        */
-
+ 
                         var center = view.center_pixelpos(layer);
                         var dx = center.x - view.pan.xdest;
                         var dy = center.y - view.pan.ydest;
                         var dist = Math.sqrt(dx*dx + dy*dy);
+
 
                         //Step 1) if destination is not in client view - zoom out until we do (or we can't zoom out anymore)
                         if(layer.level != layer.info._maxlevel && 
@@ -704,6 +721,7 @@ var methods = {
                         }
                         view.needdraw = true;
                     },
+                    */
 
                     inside: function(xt,yt,x,y,w,h) {
                         //handle negative w/h
@@ -775,68 +793,7 @@ var methods = {
                         }
                         return null;
                     },
-                    /*
-                    hittest_select_0d: function(x,y) {
-                        if(view.inside(x,y, 
-                            view.select.x-options.graber_size/2, 
-                            view.select.y-options.graber_size/2,
-                            options.graber_size, options.graber_size)) return "topleft";
-                        return null;
-                    },
 
-                    hittest_select_1d: function(x,y) {
-                        if(view.inside(x,y, 
-                            view.select.x-options.graber_size/2, 
-                            view.select.y-options.graber_size/2,
-                            options.graber_size, options.graber_size)) return "topleft";
-                        if(view.inside(x,y,
-                            view.select.x-options.graber_size/2+view.select.width, 
-                            view.select.y-options.graber_size/2+view.select.height,
-                            options.graber_size, options.graber_size)) return "bottomright";
-                        
-                        //online test
-                        var grabber_d4 = options.graber_size;
-                        if(view.select.width == 0 || view.select.height == 0) {
-                            //verticaly or horizontaly alinged
-                            if(view.inside(x-grabber_d4/2,y-grabber_d4/2, 
-                                Math.min(view.select.x, view.select.x + view.select.width)-grabber_d4, 
-                                Math.min(view.select.y, view.select.y + view.select.height)-grabber_d4, 
-                                Math.abs(view.select.width)+grabber_d4, 
-                                Math.abs(view.select.height)+grabber_d4)) {
-                                return "inside";
-                            }
-                        } else if(view.inside(x,y, view.select.x, view.select.y, view.select.width, view.select.height)) {
-                            //do line / point distance test using slope difference
-                            var lhs = (x-view.select.x)*(view.select.y + view.select.height-view.select.y);
-                            var rhs = (view.select.x + view.select.width-view.select.x)*(y-view.select.y);
-                            if(Math.abs(lhs - rhs) < 2000) return "inside";
-                        }
-                        return null;
-                    },
-
-                    hittest_select_2d: function(x,y) {
-                        if(view.inside(x,y, 
-                            view.select.x-options.graber_size/2, 
-                            view.select.y-options.graber_size/2,
-                            options.graber_size, options.graber_size)) return "topleft";
-                        if(view.inside(x,y, 
-                            view.select.x-options.graber_size/2+view.select.width, 
-                            view.select.y-options.graber_size/2, 
-                            options.graber_size, options.graber_size)) return "topright";
-                        if(view.inside(x,y,
-                            view.select.x-options.graber_size/2, 
-                            view.select.y-options.graber_size/2+view.select.height,
-                            options.graber_size, options.graber_size)) return "bottomleft";
-                        if(view.inside(x,y,
-                            view.select.x-options.graber_size/2+view.select.width, 
-                            view.select.y-options.graber_size/2+view.select.height,
-                            options.graber_size, options.graber_size)) return "bottomright";
-                        if(view.inside(x,y, 
-                            view.select.x, view.select.y,
-                            view.select.width, view.select.height)) return "inside";
-                         return null;
-                    },
-                    */
                     hittest: function(x,y) {
                         //grabber tests
                         switch(view.mode) {
@@ -890,7 +847,7 @@ var methods = {
                         return null; //no hit 
                     },
 
-                    addlayer: function(options) {
+                    addlayer: function(layer_options) {
                         var layer = {
                             //json.info will be loaded here (static information about the image)
                             info: null, 
@@ -932,11 +889,11 @@ var methods = {
                             },
                             tiles: []//tiles dictionary 
                         };
-                        layer = $.extend(layer, options);
+                        layer = $.extend(layer, layer_options);
                         view.layers.push(layer);
 
-                        process_layer_info = function(data, layer) {
-		            layer.info = data;
+                        function process_layer_info(data, layer) {
+                            layer.info = data;
                             if(layer.id != "master") {
                                 var master = view.layers[0];
                                 if(master.info == null) {          
@@ -976,63 +933,19 @@ var methods = {
                             view.recalc_viewparams(layer);
                             view.needdraw = true;
                         };
+                        var headers = {};
+                        if(options.access_token) {
+                            headers.Authorization = "Bearer "+options.access_token;
+                        }
                         $.ajax({
                             url: layer.src+"/info.json",
-                            dataType: "json",
+                            //dataType: "jsonp",
+                            headers: headers,
                             success: function(data) {
-				process_layer_info(data, layer);
-			    }
+                                process_layer_info(data, layer);
+                            }
                         });
                     }
-                    /*
-                    handler_move: function() {
-                        var pos = view.handler_client_pos();
-                        view.handler_connector.css("width", pos.width);
-                        view.handler_connector.css("height", pos.height);
-                        view.handler_connector.css("left", pos.left);
-                        view.handler_connector.css("top", pos.top);
-
-                        var con_canvas = view.handler_connector[0];
-                        con_canvas.width = pos.width;
-                        con_canvas.height = pos.height;
-                        var ctx = con_canvas.getContext("2d");
-
-                        ctx.strokeStyle = '#0c0';
-                        ctx.shadowBlur = 5;
-                        ctx.shadowColor = '#000';
-                        ctx.lineWidth=3;
-
-                        //draw line
-                        var pos1 = view.handler1.position();
-                        var pos2 = view.handler2.position();
-                        ctx.beginPath();
-                        var d_left = pos1.left - pos2.left;
-                        var d_top = pos1.top - pos2.top;
-                        if(d_left * d_top > 0) {
-                            ctx.moveTo(0,0);
-                            ctx.lineTo(pos.width, pos.height);
-                        } else {
-                            ctx.moveTo(0,pos.height);
-                            ctx.lineTo(pos.width, 0);
-                        }
-                        
-                        //draw box
-                        ctx.rect(0,0,pos.width, pos.height);
-
-                        ctx.stroke();
-                    },
-                    
-                    //return left, top, right, buttom client coordinates
-                    handler_client_pos: function() {
-                        var pos1 = view.handler1.position();
-                        var pos2 = view.handler2.position();
-                        var width = Math.abs(pos1.left - pos2.left);
-                        var height = Math.abs(pos1.top - pos2.top);
-                        var left = Math.min(pos1.left, pos2.left)+10;
-                        var top = Math.min(pos1.top, pos2.top)+10;
-                        return {top: top, left: left, width: width, height: height};
-                    }
-                    */
                 };//end view definition
 
                 $this.data("view", view);
@@ -1044,31 +957,9 @@ var methods = {
 
                 view.canvas = document.createElement("canvas"); //$("<canvas class='tv-canvas' style='background-color: #222'/>");
                 $(view.canvas).css("background-color", "#222");
+                $(view.canvas).addClass("tv-canvas");
                 $this.append(view.canvas);
                 methods.setmode.call($this, {mode: "pan"});
-
-
-                /*
-                view.handler_connector = $("<canvas class='tv-handler-connector'/>");
-                $this.append(view.handler_connector);
-
-                function create_handler(x, y) {
-                    var handler = $("<div class='tv-handler'/>");
-                    handler.draggable({
-                        drag: view.handler_move,
-                        containment: 'parent'
-                    });
-                    handler.css("top", x);
-                    handler.css("left", y);
-                    return handler;
-                }
-                view.handler1 = create_handler(50, 50);
-                $this.append(view.handler1);
-                view.handler2 = create_handler(200, 200);
-                $this.append(view.handler2);
-
-                view.handler_move(); //to get connector initialized
-                */
 
                 var status_view = $("<div class='tv-status'>status</div>");
                 $this.append(status_view);
@@ -1077,24 +968,7 @@ var methods = {
                 view.addlayer({id: "master", src: options.src, enable: true});
 
                 //redraw thread - read http://ejohn.org/blog/how-javascript-timers-work/
-                function draw_thread() {
-                //setInterval(function() {
-
-                    //I might deprecate this
-                    if(view.pan.xdest) {
-                        view.pan();
-                    }
-
-                    if(view.needdraw) {
-                        view.draw();
-                    }
-                    if(view.needdraw_control) {
-                        view.draw_controls();
-                    }
-                //}, 16);
-                    requestAnimationFrame(draw_thread);
-                };
-                requestAnimationFrame(draw_thread);
+                requestAnimFrame(draw_thread);
 
                 ///////////////////////////////////////////////////////////////////////////////////
                 //event handlers
@@ -1112,22 +986,7 @@ var methods = {
 
                     if(e.button != 2) { //not right button
                         view.mousedown = true;
-
                         var layer = view.layers[0];
-
-                        /*
-                        switch(view.mode) {
-                        case "select_0d":
-                            view.select.item = view.hittest_select_0d(x,y);
-                            break;
-                        case "select_1d":
-                            view.select.item = view.hittest_select_1d(x,y);
-                            break;
-                        case "select_2d":
-                            view.select.item = view.hittest_select_2d(x,y);
-                            break;
-                        }
-                        */
                         view.select.item = view.hittest(x,y);
                         if(view.select.item == null) {
                             view.pan.xdest = null;//cancel pan
@@ -1239,69 +1098,6 @@ var methods = {
                                 }
                                 break;
                             }
- 
-                            /*
-                            switch(view.mode) {
-                            case "select_1d":
-                                switch(view.select.item) {
-                                case "inside":
-                                    view.select.x = x - view.select.xhot;
-                                    view.select.y = y - view.select.yhot;
-                                    break;
-                                case "topleft":
-                                    view.select.x = x - view.select.xhot;
-                                    view.select.y = y - view.select.yhot;
-                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
-                                    //snap
-                                    if(Math.abs(view.select.width) < 20) {
-                                        view.select.x = x + view.select.width - view.select.xhot;
-                                        view.select.width = 0;
-                                    }
-                                    if(Math.abs(view.select.height) < 20) {
-                                        view.select.y = y + view.select.height - view.select.yhot;
-                                        view.select.height = 0;
-                                    }
-                                    break;
-                                case "bottomright":
-                                    view.select.width = x - view.select.whot;
-                                    view.select.height = y - view.select.hhot;
-                                    //snap
-                                    if(Math.abs(view.select.width) < 20) view.select.width = 0;
-                                    if(Math.abs(view.select.height) < 20) view.select.height = 0;
-                                    break;
-                                }
-                                break;
-                            case "select_2d":
-                                switch(view.select.item) {
-                                case "inside":
-                                    view.select.x = x - view.select.xhot;
-                                    view.select.y = y - view.select.yhot;
-                                    break;
-                                case "topleft":
-                                    view.select.x = x - view.select.xhot;
-                                    view.select.y = y - view.select.yhot;
-                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
-                                    break;
-                                case "topright":
-                                    view.select.y = y - view.select.yhot;
-                                    view.select.width = x - view.select.whot;
-                                    view.select.height = view.select.hprev + (view.select.yprev - view.select.y);
-                                    break;
-                                case "bottomleft":
-                                    view.select.x = x - view.select.xhot;
-                                    view.select.height = y - view.select.hhot;
-                                    view.select.width = view.select.wprev + (view.select.xprev - view.select.x);
-                                    break;
-                                case "bottomright":
-                                    view.select.width = x - view.select.whot;
-                                    view.select.height = y - view.select.hhot;
-                                    break;
-                                }
-                                break;
-                            }
-                            */
                             view.needdraw_control = true;
                         }
                     } else {
@@ -1315,17 +1111,6 @@ var methods = {
                                 options.onitemhover(view.hover);
                             }
                             break;
-                        /*
-                        case "select_0d":
-                            view.select.item = view.hittest_select_0d(x,y);
-                            break;
-                        case "select_1d":
-                            view.select.item = view.hittest_select_1d(x,y);
-                            break;
-                        case "select_2d":
-                            view.select.item = view.hittest_select_2d(x,y);
-                            break;
-                        */
                         default:        
                             view.select.item = view.hittest(x,y);
                         }
@@ -1384,19 +1169,12 @@ var methods = {
                 console.log("already initiazlied");
             }
 
+            $(window).resize(function() {
+                view.needdraw = true;
+            });
+
         }); //for each
     }, //public / init
-
-/*
-    ///////////////////////////////////////////////////////////////////////////////////
-    // 
-    zoom: function (options) {
-        return this.each(function() {
-            var view = $(this).data("view");
-            view.change_zoom(options.delta,0,0,0,0);
-        });
-    },
-*/
 
     addlayer: function (options) {
         return this.each(function() {
@@ -1432,6 +1210,7 @@ var methods = {
         });
     },
 
+    /*
     ///////////////////////////////////////////////////////////////////////////////////
     // call this if everytime you resize the container (TODO - can't it be automated?)
     resize: function (options) {
@@ -1442,6 +1221,7 @@ var methods = {
             view.needdraw = true;
         });
     },
+    */
 
     ///////////////////////////////////////////////////////////////////////////////////
     // Override current options
@@ -1464,23 +1244,6 @@ var methods = {
             view.pan.leveldest = options.level;
         });
     },
-
-    /* -- need to move all layers on all tv(s)?
-    ///////////////////////////////////////////////////////////////////////////////////
-    // use this to jump to the destination pos / zoom
-    setpos: function (options) {
-        return this.each(function() {
-            var view = $(this).data("view");
-            var layer = view.layers[0];
-            layer.xpos = options.x;
-            layer.ypos = options.y;
-            if(options.level) { //optional
-                layer.level = Math.round(options.level); //TODO process sub decimal value
-            }
-            view.needdraw = true;
-        });
-    },
-    */
 
     getpos: function () {
         //get current position
