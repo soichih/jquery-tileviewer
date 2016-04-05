@@ -64,6 +64,17 @@ if __name__ == "__main__":
 
     for level in range(options.levels):
 
+        # get image size
+        size = img.getbbox()
+
+        # create tiles
+        n_tiles_x = int(math.ceil(float(size[2]) / options.tilesize))
+        n_tiles_y = int(math.ceil(float(size[3]) / options.tilesize))
+        # print n_tiles_x, n_tiles_y
+        print "Working on tiles for level %d (%dx%d pixels --> %d x %d tiles)" % (
+            level, size[2], size[3], n_tiles_x, n_tiles_y)
+
+
         # Create output directory
         level_dir = "%s/main_tiles/level%d" % (options.outdir, level)
         try:
@@ -71,15 +82,7 @@ if __name__ == "__main__":
         except OSError:
             pass
 
-        # get image size
-        size = img.getbbox()
-        print "Working on tiles for level %d" % (level+1)
-
-        # create tiles
-        n_tiles_x = int(math.ceil(size[2] / options.tilesize))
-        n_tiles_y = int(math.ceil(size[3] / options.tilesize))
-        # print n_tiles_x, n_tiles_y
-
+            
         tile_number = 0
         for ty, tx in itertools.product(range(n_tiles_y), range(n_tiles_x)):
             # print tx, ty
@@ -107,5 +110,9 @@ if __name__ == "__main__":
         img = img.resize(new_size, resample=PIL.Image.LANCZOS)
 
         # img.save("tile_level_%d.png" % (level))
+
+        if (n_tiles_x * n_tiles_y <= 1):
+            print "only a single tile image left, skipping all further levels!"
+            break
 
         pass 
