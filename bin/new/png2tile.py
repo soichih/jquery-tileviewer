@@ -87,10 +87,12 @@ if __name__ == "__main__":
         for ty, tx in itertools.product(range(n_tiles_y), range(n_tiles_x)):
             # print tx, ty
 
+            _x = (tx+1)*options.tilesize
+            _y = (ty+1)*options.tilesize
             tile_area = (tx*options.tilesize,
                          ty*options.tilesize,
-                         (tx+1)*options.tilesize,
-                         (ty+1)*options.tilesize)
+                         _x if _x < size[2] else size[2],
+                         _y if _y < size[3] else size[3])
             img_cutout = img.crop(tile_area)
             # print tx, ty, tile_area
 
