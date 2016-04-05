@@ -18,10 +18,10 @@ if __name__ == "__main__":
     parser = OptionParser()
     parser.add_option("", "--levels", dest="levels",
                       help="Number of levels",
-                      default=6, type=int)
+                      default=10, type=int)
     parser.add_option("-s", "--tilesize", dest="tilesize",
                       help="size of an individual size",
-                      default=256, type=int)
+                      default=512, type=int)
     parser.add_option("-o", "--outdir", dest="outdir",
                       help="output directory",
                       default=".",
@@ -109,8 +109,11 @@ if __name__ == "__main__":
         new_y = int(size[3] / 2.)
         new_size = (new_x, new_y)
         # print new_size
-        img = img.resize(new_size, resample=PIL.Image.LANCZOS)
-
+        try:
+            img = img.resize(new_size, resample=PIL.Image.LANCZOS)
+        except AttributeError:
+            img = img.resize(new_size)
+            
         # img.save("tile_level_%d.png" % (level))
 
         if (n_tiles_x * n_tiles_y <= 1):
