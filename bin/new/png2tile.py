@@ -92,7 +92,7 @@ if __name__ == "__main__":
             # print tx, ty, tile_area
 
             tile_filename = "%s/%d.%s" % (level_dir, tile_number, options.filetype)
-            print tile_filename
+            # print tile_filename
             img_cutout.save(tile_filename)
             tile_number += 1
 
