@@ -850,6 +850,7 @@ var methods = {
                         view.layers.push(layer);
 
                         function process_layer_info(data, layer) {
+                            console.dir(data);
                             layer.info = data;
                             if(layer.id != "master") {
                                 var master = view.layers[0];

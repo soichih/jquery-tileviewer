@@ -10,11 +10,8 @@ Tileviewer has a server side script (tile.py) which will split your original lar
 In order to display your image via TileViewer, first you need to tile your images using tile.py (get it from the Download page) on your web server.
 
 ```
-yum install GraphicsMagick 
-./tile.py my_big_image.jpg /var/www/html/tiles/my_big_image
+./bin/tile.py large_image.png -o tiledir
 ```
-
-First argument is your image that you'd like to tile (image file type could be anything as long as it's supported by GraphicsMagick library), and second argument is the directory where you want to store your tiles. It needs to be exposed via your web server.
 
 You can then create use TileViewer plugin to render your image by doing something like following.
 

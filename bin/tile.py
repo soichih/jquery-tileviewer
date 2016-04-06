@@ -1,153 +1,124 @@
-#!/usr/bin/python
-#
-# Copyright (c) 2011 Soichi Hayashi (https://sites.google.com/site/soichih/)
-# Licensed under the MIT License 
-#
-# TileViewer HTML5 server-side script
-# Version: 2.0.0
-#
-# Dependency:
-#
-#     You need to install GraphicsMagick (http://www.graphicsmagick.org/)
-#     > yum install GraphicsMagick
-#
-# Usage
-# ./tile.py <source_image> <output_dir>
+#!/usr/bin/env python
 
-import os
-import sys
-import subprocess
-import time
+#import numpy
+import os, sys
+#import Image, ImageDraw
+import math
 
-#configuration
-#tmpdir="/usr/local/tmp"
-tmpdir="/dev/shm"
-tilesize=256
-
-def tile(source_image, tile_dir):
-    global tmpdir
-    global tilesize
-
-    #expand ~(user) path
-    source_image = os.path.expanduser(source_image)
-    tile_dir = os.path.expanduser(tile_dir)
-    tmpdir=os.path.expanduser(tmpdir)
-
-    #check to see if tmpdir exists
-    if not os.path.exists(tmpdir):
-        print "configured tmpdir:"+tmpdir+" doesn't exist"
-        sys.exit(1)
-
-    basename = os.path.basename(source_image)
-    os.putenv("MAGICK_TMPDIR", tmpdir)
-
-    #if tile directory already exist, skip this image
-    if os.path.exists(tile_dir):
-        print tile_dir,"already exists .. bailing"
-        sys.exit(1)
-
-    #if it's compressed fits file, expand it (using funpack command)
-    funpacked_image = None
-    if source_image.endswith(".fz"):
-        print "uncompressing .fz to .fits"
-        funpacked_image = tmpdir+"/"+basename+".fits"
-        cmd = "funpack -O "+funpacked_image+" "+source_image
-        print cmd
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for line in proc.stdout.readlines():
-            print line.strip()
-        if proc.wait() != 0:    
-            for line in proc.stderr.readlines():
-                print line.strip()
-            sys.exit(1)
-        source_image = funpacked_image
-        basename = os.path.basename(source_image) #I have to reset this again.
-
-    #print time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
-    print "generating tile for", source_image
-    os.makedirs(tile_dir)
-
-    #repeatedly reduce the image size
-    level=0
-    processing_image = source_image 
-    while 1:
-        print "level", level
-        level_dir = tile_dir+"/level"+str(level)
-        os.makedirs(level_dir)
-        cmd = "gm convert "+processing_image+" -crop "+str(tilesize)+"x"+str(tilesize)+" +adjoin "+level_dir+"/%d.png"
-        print cmd
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for line in proc.stdout.readlines():
-            print line.strip()
-        #proc.stdout.close()
-        if proc.wait() != 0:    
-            print "ERROR : while runing $ "+cmd
-            for line in proc.stderr.readlines():
-                print line.strip()
-            sys.exit(1)
-
-        #if number of images are lower than it should, we are done
-        count = 0
-        for root, dirs, files in os.walk(level_dir):
-            for file in files:    
-                count += 1
-        if count == 1:
-            break
-
-        #create new level
-        level=level+1
-
-        #shrink
-        dest_image = tmpdir + "/" + "tile.level" + str(level) + "." + os.path.basename(basename)
-        #cmd = "gm convert "+processing_image+" -resize 50% "+dest_image
-        cmd = "gm convert "+processing_image+" -scale 50% "+dest_image
-        print cmd
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for line in proc.stdout.readlines():
-            print line.strip()
-
-        #proc.stdout.close()
-        if proc.wait() != 0:    
-            print "ERROR : while runing $ "+cmd
-            for line in proc.stderr.readlines():
-                print line.strip()
-            sys.exit(1)
-
-
-        #remove previously used temp file (if exist)
-        if level > 1:
-            os.remove(processing_image)
-
-        processing_image = dest_image
-
-    #tileviewer doesn't need this anymore (it will use the smallest tile as thumb)
-    #print "creating thumnail from last processing image"
-    #cmd = "gm convert "+processing_image+" -normalize -size 128x128 -resize 128x128 +profile \"*\" "+tile_dir+"/thumb.png"
-    #proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    #for line in proc.stdout.readlines():
-    #    print line.strip()
-
-    print "creating info.json"
-    cmd = "gm identify "+source_image
-    prop = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    lines = prop.stdout.readlines();
-    size = lines[0].split(" ")[2].split("+")[0].split("x")
-    info = open(tile_dir + "/info.json", "w")
-    info.write("{\n")
-    info.write("\"width\": "+size[0]+",\n")
-    info.write("\"height\": "+size[1]+",\n")
-    info.write("\"tilesize\": "+str(tilesize)+"\n")
-    info.write("}")
-
-    #remove last used tmp file
-    if level > 1:
-        os.remove(processing_image)
-
-    if funpacked_image != None:
-        os.remove(funpacked_image)
-
-    print "all done"
+import PIL
+from PIL import Image
+from optparse import OptionParser
+import itertools
+import json
 
 
 if __name__ == "__main__":
-    tile(sys.argv[1], sys.argv[2])
+
+    # Read the command line options
+    parser = OptionParser()
+    parser.add_option("", "--levels", dest="levels",
+                      help="Number of levels",
+                      default=10, type=int)
+    parser.add_option("-s", "--tilesize", dest="tilesize",
+                      help="size of an individual size",
+                      default=512, type=int)
+    parser.add_option("-o", "--outdir", dest="outdir",
+                      help="output directory",
+                      default=".",
+                      )
+    parser.add_option("-t", "--type", dest="filetype",
+                      help="file type (e.g. png, jpg)",
+                      default="png",
+                      )
+    (options, cmdline_args) = parser.parse_args()
+
+
+    infile = cmdline_args[0]
+    print options.outdir
+
+    #
+    # open input image
+    #
+    img = Image.open(infile)
+
+    size = img.getbbox()
+    print "Original image dimensions: %d x %d pixels" % (size[2], size[3])
+
+    # 
+    # Write a small json file to encapsulate information about the frame
+    #
+    json_data = {
+        "width": size[2],
+        "height": size[3],
+        "tilesize": options.tilesize,
+        "filetype": options.filetype,
+        }
+    main_tiles_dir = "%s/main_tiles" % (options.outdir)
+    json_filename = "%s/info.json" % (main_tiles_dir)
+    try:
+        os.makedirs(main_tiles_dir)
+    except OSError:
+        pass
+    with open(json_filename, 'w') as outfile:
+        json.dump(json_data, outfile)
+
+
+    for level in range(options.levels):
+
+        # get image size
+        size = img.getbbox()
+
+        # create tiles
+        n_tiles_x = int(math.ceil(float(size[2]) / options.tilesize))
+        n_tiles_y = int(math.ceil(float(size[3]) / options.tilesize))
+        # print n_tiles_x, n_tiles_y
+        print "Working on tiles for level %d (%dx%d pixels --> %d x %d tiles)" % (
+            level, size[2], size[3], n_tiles_x, n_tiles_y)
+
+
+        # Create output directory
+        level_dir = "%s/main_tiles/level%d" % (options.outdir, level)
+        try:
+            os.makedirs(level_dir)
+        except OSError:
+            pass
+
+            
+        tile_number = 0
+        for ty, tx in itertools.product(range(n_tiles_y), range(n_tiles_x)):
+            # print tx, ty
+
+            _x = (tx+1)*options.tilesize
+            _y = (ty+1)*options.tilesize
+            tile_area = (tx*options.tilesize,
+                         ty*options.tilesize,
+                         _x if _x < size[2] else size[2],
+                         _y if _y < size[3] else size[3])
+            img_cutout = img.crop(tile_area)
+            # print tx, ty, tile_area
+
+            tile_filename = "%s/%d.%s" % (level_dir, tile_number, options.filetype)
+            # print tile_filename
+            img_cutout.save(tile_filename)
+            tile_number += 1
+
+        # image.crop((left,upper,right,lower)
+        
+
+        # shrink down by factor 2
+        new_x = int(size[2] / 2.)
+        new_y = int(size[3] / 2.)
+        new_size = (new_x, new_y)
+        # print new_size
+        try:
+            img = img.resize(new_size, resample=PIL.Image.LANCZOS)
+        except AttributeError:
+            img = img.resize(new_size)
+            
+        # img.save("tile_level_%d.png" % (level))
+
+        if (n_tiles_x * n_tiles_y <= 1):
+            print "only a single tile image left, skipping all further levels!"
+            break
+
+        pass 
