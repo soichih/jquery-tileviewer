@@ -9,8 +9,18 @@ Tileviewer has a server side script (tile.py) which will split your original lar
 ## Installation 
 In order to display your image via TileViewer, first you need to tile your images using tile.py (get it from the Download page) on your web server.
 
+
+For png tiles (default)
 ```
 ./bin/tile.py large_image.png -o tiledir
+```
+
+For jpeg tiles (smaller)
+
+You will need to install libjpeg-devel and reinstall pillow / image pip modules
+
+```
+./bin/tile.py large_image.png -t jpg -o tiledir
 ```
 
 You can then create use TileViewer plugin to render your image by doing something like following.
