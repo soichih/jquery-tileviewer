@@ -53,10 +53,10 @@ if __name__ == "__main__":
         "tilesize": options.tilesize,
         "filetype": options.filetype,
         }
-    main_tiles_dir = "%s/main_tiles" % (options.outdir)
-    json_filename = "%s/info.json" % (main_tiles_dir)
+    #main_tiles_dir = "%s/main_tiles" % (options.outdir)
+    json_filename = "%s/info.json" % (options.outdir)
     try:
-        os.makedirs(main_tiles_dir)
+        os.makedirs(options.outdir)
     except OSError:
         pass
     with open(json_filename, 'w') as outfile:
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
 
         # Create output directory
-        level_dir = "%s/main_tiles/level%d" % (options.outdir, level)
+        level_dir = "%s/level%d" % (options.outdir, level)
         try:
             os.makedirs(level_dir)
         except OSError:
