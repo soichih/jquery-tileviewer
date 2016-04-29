@@ -860,15 +860,14 @@ var methods = {
                                     return;
                                 }
                             }
-                            //layer.info = data;
-
                             //calculate metadata
                             var v1 = Math.max(layer.info.width, layer.info.height)/layer.info.tilesize;
                             layer.info._maxlevel = Math.ceil(Math.log(v1)/Math.log(2));
 
                             //set initial level/size to fit the entire view
+                            //TODO - update this to completely fill the browser window
                             var min = Math.min(view.canvas.width, view.canvas.height)/layer.info.tilesize; //number of tiles that can fit
-                            layer.level = layer.info._maxlevel - Math.floor(min) - 1;
+                            layer.level = layer.info._maxlevel - Math.floor(min)-2;
                             layer.tilesize = layer.info.tilesize/2;
 
                             //center image
@@ -882,6 +881,14 @@ var methods = {
                                 layer.xpos = master.xpos;
                                 layer.ypos = master.ypos;
                             }
+
+                            /*
+                            //compute level / layer.tilezie to fill the enter view
+                            var xtiles = view.canvas.clientWidth / layer.info.width;
+                            var ytiles = view.canvas.clientHeight / layer.info.height;
+                            var tiles = Math.max(xtiles, ytiles);
+                            console.log(layer.tilesize);
+                            */
 
                             //cache level0 image (so that we don't have to use the green rect too long..) and use it as thumbnail
                             var thumb_url = layer.src+"/level"+layer.info._maxlevel+"/0";
