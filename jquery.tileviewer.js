@@ -460,7 +460,8 @@ var methods = {
                                 }
                                                                 
                                 //do load the image
-                                var src = img.request_src+"."+layer.info.filetype||"png";
+                                //var src = img.request_src+"."+layer.info.filetype||"png";
+                                var src = img.request_src+".png";
                                 if(options.access_token) {
                                     src += "?at="+options.access_token;
                                 }
